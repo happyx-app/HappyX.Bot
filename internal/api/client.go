@@ -85,6 +85,9 @@ type Member struct {
 	Active    bool   `json:"active"`
 	// Streak is how many days in a row they answered; only filled by SurveyRecipients withStreak.
 	Streak int `json:"streak"`
+	// PolicyPending is true while they haven't answered in the guild since the privacy policy's
+	// date; only filled by SurveyRecipients.
+	PolicyPending bool `json:"policy_pending"`
 }
 
 type GuildPatch struct {

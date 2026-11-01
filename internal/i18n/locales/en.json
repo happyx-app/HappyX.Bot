@@ -13,6 +13,7 @@
   "survey.anonymous": "🔒 Anonymous answer",
   "survey.named": "👁 The admin sees who answers",
   "survey.stop_button": "Don't ask me again",
+  "survey.policy_button": "Privacy policy",
   "survey.title": "{guild} · Daily survey",
   "survey.greeting": "👋 Hi, {name}!",
   "answer.thanks": "{emoji} Thanks, {name}!",

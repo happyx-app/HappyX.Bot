@@ -294,6 +294,19 @@ func TestSurveyMessage(t *testing.T) {
 	if len(msg.Components) != 2 || msg.AllowedMentions == nil || len(msg.AllowedMentions.Parse) != 0 {
 		t.Fatalf("components or mentions: %+v %+v", msg.Components, msg.AllowedMentions)
 	}
+	// No policy link unless the API says they haven't answered since the policy's date.
+	if row := msg.Components[1].(discordgo.ActionsRow); len(row.Components) != 1 {
+		t.Fatalf("second row without a policy: %+v", row.Components)
+	}
+	first := ana
+	first.PolicyURL = "https://happyx.example.com/#/privacy-policy"
+	row := surveyMessage(es, g, "2026-10-23", first, "").Components[1].(discordgo.ActionsRow)
+	if len(row.Components) != 2 {
+		t.Fatalf("second row with a policy: %+v", row.Components)
+	}
+	if b := row.Components[1].(discordgo.Button); b.Style != discordgo.LinkButton || b.URL != first.PolicyURL || b.Label != "Política de privacidad" || b.CustomID != "" {
+		t.Fatalf("policy button: %+v", b)
+	}
 	g.Anonymous = false
 	if msg := surveyMessage(es, g, "2026-10-23", ana, ""); msg.Embeds[0].Footer.Text != es.T("survey.named") {
 		t.Fatalf("named notice: %q", msg.Embeds[0].Footer.Text)

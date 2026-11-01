@@ -10,6 +10,7 @@
   "survey.anonymous": "🔒 Resposta anònima",
   "survey.named": "👁 L'admin veu qui respon",
   "survey.stop_button": "No m'ho tornis a preguntar",
+  "survey.policy_button": "Política de privacitat",
   "survey.title": "{guild} · Enquesta diària",
   "survey.greeting": "👋 Hola, {name}!",
   "answer.thanks": "{emoji} Gràcies, {name}!",

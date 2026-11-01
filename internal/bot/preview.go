@@ -46,6 +46,8 @@ func Previews(code string) []Preview {
 	sunToThu.WorkingDays = presetDays("sun_thu")
 	day := "2026-10-23"
 	ana := surveyRecipient{ID: PreviewAnaID, Name: "Ana", Streak: 5}
+	anaFirst := ana
+	anaFirst.PolicyURL = "https://happyx.example.com/#/privacy-policy"
 	custom := g
 	custom.SurveyMessage = "👋 ¡Hola {{user.name}}! ¿Cómo te encuentras hoy, {{weekday}}? ({{guild.name}})\nLlevas {{user.streak}} días seguidos respondiendo 🔥"
 	kudosMsg := "Gracias por echarme un cable con el despliegue del viernes, sin ti no llegábamos 🚀"
@@ -71,6 +73,7 @@ func Previews(code string) []Preview {
 	return []Preview{
 		{Title: "Daily survey", Channel: "DM", Msg: surveyMessage(l, g, day, ana, PreviewGuildIcon)},
 		{Title: "Daily survey with the admin's own message", Channel: "DM", Msg: surveyMessage(l, custom, day, ana, PreviewGuildIcon)},
+		{Title: "Daily survey until the first answer since the privacy policy's date", Channel: "DM", Msg: surveyMessage(l, g, day, anaFirst, PreviewGuildIcon)},
 		{Title: "After answering", Channel: "DM", Msg: data(answered)},
 		{Title: "After adding a comment", Channel: "DM", Msg: data(commented)},
 		{Title: "Kudos card", Channel: "#kudos", Command: "/happyx kudos", Msg: kudosCard(l, anaP, beaP, kudosMsg, nil)},

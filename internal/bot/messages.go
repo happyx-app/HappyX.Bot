@@ -30,6 +30,9 @@ type surveyRecipient struct {
 	ID     string
 	Name   string // their name in the server
 	Streak int    // days in a row they answered
+	// PolicyURL is the privacy policy, set until they first answer since its date (the API's
+	// policy_pending): the survey then carries a link button to it.
+	PolicyURL string
 }
 
 // surveyColor is HappyX's violet, the colour of the survey card until it's answered.
@@ -59,20 +62,24 @@ func surveyMessage(l *i18n.Locale, g api.Guild, day string, to surveyRecipient, 
 	if icon != "" {
 		embed.Thumbnail = &discordgo.MessageEmbedThumbnail{URL: icon}
 	}
+	more := []discordgo.MessageComponent{
+		discordgo.Button{
+			Label:    l.T("survey.stop_button"),
+			Emoji:    &discordgo.ComponentEmoji{Name: "🔕"},
+			Style:    discordgo.SecondaryButton,
+			CustomID: surveyID{Action: actionStop, GuildID: g.DiscordID, Day: day}.String(),
+		},
+	}
+	if to.PolicyURL != "" {
+		more = append(more, discordgo.Button{Label: l.T("survey.policy_button"), Style: discordgo.LinkButton, URL: to.PolicyURL})
+	}
 	return &discordgo.MessageSend{
 		Embeds: []*discordgo.MessageEmbed{embed},
 		// A custom message may hold @everyone or role mentions; they're shown but never ping.
 		AllowedMentions: &discordgo.MessageAllowedMentions{Parse: []discordgo.AllowedMentionType{}},
 		Components: []discordgo.MessageComponent{
 			discordgo.ActionsRow{Components: buttons},
-			discordgo.ActionsRow{Components: []discordgo.MessageComponent{
-				discordgo.Button{
-					Label:    l.T("survey.stop_button"),
-					Emoji:    &discordgo.ComponentEmoji{Name: "🔕"},
-					Style:    discordgo.SecondaryButton,
-					CustomID: surveyID{Action: actionStop, GuildID: g.DiscordID, Day: day}.String(),
-				},
-			}},
+			discordgo.ActionsRow{Components: more},
 		},
 	}
 }

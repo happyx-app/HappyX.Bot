@@ -12,6 +12,7 @@
   "survey.anonymous": "🔒 Resposta anônima",
   "survey.named": "👁 O admin vê quem responde",
   "survey.stop_button": "Não perguntar mais",
+  "survey.policy_button": "Política de privacidade",
   "survey.title": "{guild} · Pesquisa diária",
   "survey.greeting": "👋 Oi, {name}!",
   "answer.thanks": "{emoji} Obrigado, {name}!",

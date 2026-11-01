@@ -59,7 +59,8 @@ func New(token string, client *api.Client, log *slog.Logger) (*Bot, error) {
 	return b, nil
 }
 
-// SetWebURL tells the bot where the dashboard is, so it can link members to the game.
+// SetWebURL tells the bot where the dashboard is, so it can link members to the game and the
+// privacy policy.
 func (b *Bot) SetWebURL(u string) { b.webURL = strings.TrimRight(u, "/") }
 
 // Run connects to Discord and runs the scheduler until ctx is cancelled.
@@ -379,8 +380,20 @@ func (b *Bot) sendSurvey(ctx context.Context, g api.Guild, day string) (delivery
 	l := i18n.Get(g.Language)
 	icon := b.guildIcon(g.DiscordID)
 	return b.dmEach(g, members, func(m api.Member) *discordgo.MessageSend {
-		return surveyMessage(l, g, day, surveyRecipient{ID: m.DiscordID, Name: b.displayName(g.DiscordID, m), Streak: m.Streak}, icon)
+		to := surveyRecipient{ID: m.DiscordID, Name: b.displayName(g.DiscordID, m), Streak: m.Streak}
+		if m.PolicyPending {
+			to.PolicyURL = b.policyURL()
+		}
+		return surveyMessage(l, g, day, to, icon)
 	}, "survey")
+}
+
+// policyURL is the privacy policy on the dashboard, or empty without WEB_URL.
+func (b *Bot) policyURL() string {
+	if b.webURL == "" {
+		return ""
+	}
+	return b.webURL + "/#/privacy-policy"
 }
 
 // guildIcon is the server's icon URL, or empty when it has none or isn't cached.

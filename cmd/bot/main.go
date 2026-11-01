@@ -38,6 +38,6 @@ func run(log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	b.SetWebURL(os.Getenv("WEB_URL")) // optional: links to the game on the dashboard
+	b.SetWebURL(os.Getenv("WEB_URL")) // optional: links to the game and the privacy policy on the dashboard
 	return b.Run(ctx)
 }

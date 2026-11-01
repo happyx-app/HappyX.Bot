@@ -137,7 +137,7 @@ All from environment variables (see `.env.example`):
 | `DISCORD_TOKEN` | Bot token |
 | `API_URL` | HappyX.Api base URL, e.g. `http://api:8080` inside docker compose |
 | `API_KEY` | API key; put its SHA-256 hash in the API's `API_KEY_HASHES` |
-| `WEB_URL` | Optional. The dashboard's public URL, e.g. `https://happyx.example.com`. The game links there to guess; without it the Thursday DM only asks for next week's question |
+| `WEB_URL` | Optional. The dashboard's public URL, e.g. `https://happyx.example.com`. The game links there to guess, and the survey links the privacy policy until someone first answers since its date; without it the Thursday DM only asks for next week's question and the survey has no policy link |
 
 ## Development
 

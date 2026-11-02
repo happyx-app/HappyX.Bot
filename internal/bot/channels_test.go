@@ -31,3 +31,16 @@ func TestChannelListFollowsDiscordOrder(t *testing.T) {
 		t.Errorf("can_post: %+v", got)
 	}
 }
+
+func TestChannelListSkipsHiddenChannels(t *testing.T) {
+	chans := []*discordgo.Channel{
+		{ID: "10", Name: "___hidden___", Type: discordgo.ChannelTypeGuildCategory, Position: 0, Flags: channelObfuscated},
+		{ID: "20", Name: "___hidden___", Type: discordgo.ChannelTypeGuildText, ParentID: "10", Position: 0, Flags: channelObfuscated},
+		{ID: "21", Name: "general", Type: discordgo.ChannelTypeGuildText, Position: 1},
+		{ID: "22", Name: "news", Type: discordgo.ChannelTypeGuildNews, Position: 2, Flags: 1 << 1},
+	}
+	got := channelList(chans, func(string) bool { return true })
+	if len(got) != 2 || got[0].ID != "21" || got[1].ID != "22" {
+		t.Fatalf("got %+v, want general and news only", got)
+	}
+}

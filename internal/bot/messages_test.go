@@ -210,7 +210,7 @@ func TestGameQuestionRotates(t *testing.T) {
 func TestPreviews(t *testing.T) {
 	for _, code := range i18n.Codes() {
 		for _, p := range Previews(code) {
-			if p.Msg == nil || (p.Msg.Content == "" && len(p.Msg.Embeds) == 0) {
+			if p.Msg == nil || (p.Msg.Content == "" && len(p.Msg.Embeds) == 0 && len(p.Msg.Components) == 0) {
 				t.Errorf("%s: %q is empty", code, p.Title)
 			}
 		}

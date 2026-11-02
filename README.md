@@ -41,6 +41,9 @@ report. One bot serves any number of servers; their data is kept apart by
   dashboard. The API keeps its data for 30 days in case the bot is added back, then deletes it.
 - **Deleting a server on the dashboard** (Settings → Delete server from HappyX) deletes all its data
   at once; within a minute the bot leaves the server by itself.
+- **Setup assistant**: when the bot joins a server it DMs the owner a two-page assistant (survey,
+  then report and extras) where every select saves at once; `/happyx setup` shows it again. It can
+  send a test survey that saves nothing and post a short introduction of HappyX in a channel.
 - **Survey**: on the server's working days (Monday to Friday by default; `/happyx config working_days`
   offers common sets, the web any days), from the configured hour (default 13:00 Europe/Madrid) the bot DMs every active member
   a card (greeting, the anonymity notice, the server's icon) with five emoji buttons. After
@@ -83,6 +86,7 @@ report. One bot serves any number of servers; their data is kept apart by
 | `/happyx pause` / `/happyx resume` | everyone | stop / resume receiving the survey in this server |
 | `/happyx kudos` | everyone | `user`, `message` (≤300): publicly thank a teammate |
 | Apps › **Give kudos** | everyone | right-click a user or a message: the same kudos, text written in a form |
+| `/happyx setup` | manage | step-by-step setup assistant, only visible to whoever runs it |
 | `/happyx config` | manage | `anonymous`, `hour`, `timezone`, `frequency`, `language`, `admin`, `kudos_channel`, `working_days`, `games` |
 | `/happyx report` | view | see the last completed period's report now, or the one in progress with `period:current` |
 

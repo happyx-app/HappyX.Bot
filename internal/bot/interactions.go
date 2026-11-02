@@ -22,6 +22,7 @@ const (
 	cmdReport = "report"
 	cmdConfig = "config"
 	cmdKudos  = "kudos"
+	cmdSetup  = "setup"
 
 	// menuKudos is the right-click "Give kudos" on a user or a message; en.json's menu.kudos.
 	menuKudos = "Give kudos"
@@ -117,6 +118,7 @@ func commands() []*discordgo.ApplicationCommand {
 			sub(cmdResume),
 			sub(cmdReport, period),
 			sub(cmdKudos, kudosUser, kudosMessage),
+			sub(cmdSetup),
 			sub(cmdConfig,
 				opt(discordgo.ApplicationCommandOptionBoolean, optAnonymous),
 				hour,
@@ -156,6 +158,14 @@ func (b *Bot) onInteraction(s *discordgo.Session, i *discordgo.InteractionCreate
 	case discordgo.InteractionApplicationCommand:
 		b.handleCommand(ctx, i)
 	case discordgo.InteractionMessageComponent:
+		customID := i.MessageComponentData().CustomID
+		if id, ok := parseSetupID(customID); ok {
+			b.handleSetup(ctx, i, id)
+			return
+		}
+		if b.handleTestButton(ctx, i, customID) {
+			return
+		}
 		if id, ok := parseGameID(i.MessageComponentData().CustomID); ok && (id.Action == gameAnswer || id.Action == gamePropose) {
 			b.handleGameButton(ctx, i, id)
 			return
@@ -319,6 +329,8 @@ func (b *Bot) handleCommand(ctx context.Context, i *discordgo.InteractionCreate)
 		b.cmdReport(ctx, i, l, user, sub.Options)
 	case cmdKudos:
 		b.cmdKudos(ctx, i, l, user, sub.Options)
+	case cmdSetup:
+		b.cmdSetup(ctx, i, user)
 	}
 }
 

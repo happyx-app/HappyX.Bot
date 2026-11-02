@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -32,6 +33,9 @@ type Bot struct {
 	skip map[string]time.Time
 
 	commandID atomic.Pointer[string] // /happyx's ID once registered, for clickable mentions
+
+	mu       sync.Mutex
+	welcomed map[string]bool // servers sent the setup assistant since start
 }
 
 func New(token string, client *api.Client, log *slog.Logger) (*Bot, error) {
@@ -42,7 +46,7 @@ func New(token string, client *api.Client, log *slog.Logger) (*Bot, error) {
 	// GuildMembers is a privileged intent: enable "Server Members Intent" in the
 	// Discord developer portal.
 	dg.Identify.Intents = discordgo.IntentsGuilds | discordgo.IntentsGuildMembers | discordgo.IntentsDirectMessages
-	b := &Bot{dg: dg, api: client, log: log, now: time.Now, skip: map[string]time.Time{}}
+	b := &Bot{dg: dg, api: client, log: log, now: time.Now, skip: map[string]time.Time{}, welcomed: map[string]bool{}}
 	dg.AddHandler(b.onReady)
 	dg.AddHandler(b.onGuildCreate)
 	dg.AddHandler(b.onGuildDelete)
@@ -123,6 +127,28 @@ func (b *Bot) onGuildCreate(s *discordgo.Session, e *discordgo.GuildCreate) {
 		return
 	}
 	b.log.Info("guild ready", "guild", e.ID, "name", e.Name, "members", n)
+	if b.justJoined(e.ID, e.JoinedAt) {
+		b.sendSetup(ctx, e.ID, e.OwnerID) // after the sync, so it can count who gets the survey
+	}
+}
+
+// joinedRecently is how long after joining a server GuildCreate still means "just added", and
+// not a reconnect: syncing a big server's members can take a while.
+const joinedRecently = 10 * time.Minute
+
+// justJoined reports whether the bot was just added to the server, once per server and run, so
+// a reconnect soon after joining doesn't send the setup assistant twice.
+func (b *Bot) justJoined(guildID string, joinedAt time.Time) bool {
+	if joinedAt.IsZero() || b.now().Sub(joinedAt) > joinedRecently {
+		return false
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.welcomed[guildID] {
+		return false
+	}
+	b.welcomed[guildID] = true
+	return true
 }
 
 // syncRoles sends the server's roles, as the session's state holds them after a role event.

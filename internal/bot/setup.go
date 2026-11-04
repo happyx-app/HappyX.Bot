@@ -233,15 +233,32 @@ func offHint(l *i18n.Locale, g api.Guild) string {
 	return "\n" + l.T("setup.off_hint")
 }
 
+// surveyNotice confirms the survey was started or turned off, asking the API whether today's
+// survey already went out when it would be due now.
+func (b *Bot) surveyNotice(ctx context.Context, l *i18n.Locale, g api.Guild, withDate bool) string {
+	now := b.now()
+	sentToday := false
+	st := schedule.Settings{Timezone: g.Timezone, SurveyHour: g.SurveyHour, WorkingDays: g.WorkingDays}
+	if day, due := schedule.SurveyDue(st, now); due && g.SendsSurvey() {
+		sent, err := b.api.DispatchSent(ctx, g.DiscordID, "survey", day)
+		if err != nil {
+			b.log.Warn("dispatch sent", "guild", g.DiscordID, "err", err)
+			return l.T("setup.on") // unknown: say only that it's on
+		}
+		sentToday = sent
+	}
+	return surveyStateNotice(l, g, now, withDate, sentToday)
+}
+
 // surveyStateNotice confirms the survey was started or turned off. A survey started after its
-// hour on a working day goes out right away. withDate adds when the first one comes, for
-// replies that don't show the next survey already.
-func surveyStateNotice(l *i18n.Locale, g api.Guild, now time.Time, withDate bool) string {
+// hour on a working day goes out right away, unless today's already went out (sentToday).
+// withDate adds when the next one comes, for replies that don't show the next survey already.
+func surveyStateNotice(l *i18n.Locale, g api.Guild, now time.Time, withDate, sentToday bool) string {
 	if !g.SendsSurvey() {
 		return l.T("setup.stopped")
 	}
 	st := schedule.Settings{Timezone: g.Timezone, SurveyHour: g.SurveyHour, WorkingDays: g.WorkingDays}
-	if _, due := schedule.SurveyDue(st, now); due {
+	if _, due := schedule.SurveyDue(st, now); due && !sentToday {
 		return l.T("setup.started_now")
 	}
 	if !withDate {
@@ -622,7 +639,7 @@ func (b *Bot) handleSetup(ctx context.Context, i *discordgo.InteractionCreate, i
 				l = i18n.Get(g.Language) // redraw in the language just chosen
 			}
 			if p.SurveyEnabled != nil {
-				notice = surveyStateNotice(l, g, b.now(), false)
+				notice = b.surveyNotice(ctx, l, g, false)
 			}
 		}
 	}

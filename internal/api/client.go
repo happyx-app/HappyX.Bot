@@ -380,6 +380,19 @@ func (c *Client) FinishDispatch(ctx context.Context, guildID, kind, period strin
 		map[string]int{"recipients": recipients, "failed": failed}, nil)
 }
 
+// DispatchSent reports whether the period was already claimed for sending. An older API without
+// this call answers an error.
+func (c *Client) DispatchSent(ctx context.Context, guildID, kind, period string) (bool, error) {
+	err := c.do(ctx, http.MethodGet, "/v1/guilds/"+url.PathEscape(guildID)+"/dispatches/"+url.PathEscape(kind)+"/"+url.PathEscape(period), nil, nil)
+	if errors.Is(err, ErrNotFound) {
+		var apiErr *Error
+		if errors.As(err, &apiErr) && apiErr.Message == "not dispatched" {
+			return false, nil
+		}
+	}
+	return err == nil, err
+}
+
 // ReleaseDispatch gives back a claimed send that reached nobody, so a later claim can retry it.
 func (c *Client) ReleaseDispatch(ctx context.Context, guildID, kind, period string) error {
 	return c.do(ctx, http.MethodDelete, "/v1/guilds/"+url.PathEscape(guildID)+"/dispatches/"+url.PathEscape(kind)+"/"+url.PathEscape(period), nil, nil)

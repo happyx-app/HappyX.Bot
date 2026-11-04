@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -363,11 +364,12 @@ func (b *Bot) cmdStatus(ctx context.Context, i *discordgo.InteractionCreate, l *
 			you = l.T("status.receiving")
 		}
 	}
-	b.ephemeral(i, l.T("status.text",
+	text := l.T("status.text",
 		"days", workingDaysText(l, g.WorkingDays), "hour", fmt.Sprintf("%02d", g.SurveyHour), "timezone", g.Timezone,
 		"frequency", l.T("freq."+g.ReportFrequency), "admin", "<@"+g.AdminDiscordID+">",
 		"anonymous", yesNo(l, g.Anonymous), "language", i18n.Get(g.Language).Name,
-		"participants", len(recipients), "you", you)+reportDMLine(l, g)+"\n"+kudosChannelLine(l, g)+"\n"+gameLine(l, g)+offLine(b.surveyOffLine(l, g)))
+		"participants", len(recipients), "you", you)
+	b.ephemeral(i, afterFirstLine(text, b.surveyOffLine(l, g))+reportDMLine(l, g)+"\n"+kudosChannelLine(l, g)+"\n"+gameLine(l, g))
 }
 
 func (b *Bot) cmdConfig(ctx context.Context, i *discordgo.InteractionCreate, l *i18n.Locale, user *discordgo.User, opts []*discordgo.ApplicationCommandInteractionDataOption) {
@@ -425,7 +427,7 @@ func (b *Bot) cmdConfig(ctx context.Context, i *discordgo.InteractionCreate, l *
 	}
 	s := configSaved(l, g, p)
 	if p.SurveyEnabled != nil {
-		s += "\n" + surveyStateNotice(l, g, b.now(), true)
+		s += "\n" + b.surveyNotice(ctx, l, g, true)
 	} else if line := b.surveyOffLine(l, g); line != "" {
 		s += "\n" + line
 	}
@@ -561,11 +563,16 @@ func (b *Bot) surveyOffLine(l *i18n.Locale, g api.Guild) string {
 	return l.T("status.survey_off", "command", b.setupMention())
 }
 
-func offLine(s string) string {
-	if s == "" {
-		return ""
+// afterFirstLine puts line right under the first line of text (the survey's schedule), if any.
+func afterFirstLine(text, line string) string {
+	if line == "" {
+		return text
 	}
-	return "\n" + s
+	first, rest, ok := strings.Cut(text, "\n")
+	if !ok {
+		return text + "\n" + line
+	}
+	return first + "\n" + line + "\n" + rest
 }
 
 // reportDMLine says the report is not sent by DM, when the admin chose to see it only on the web.

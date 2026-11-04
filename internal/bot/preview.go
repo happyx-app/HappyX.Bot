@@ -146,7 +146,7 @@ func setupPreviews(l *i18n.Locale, g api.Guild) []Preview {
 	on := true
 	started := done
 	started.Guild.SurveyEnabled = &on
-	started.Notice = surveyStateNotice(l, started.Guild, now, false)
+	started.Notice = surveyStateNotice(l, started.Guild, now, false, false)
 
 	named := page2.Guild
 	named.Anonymous = false

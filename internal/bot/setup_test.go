@@ -122,17 +122,33 @@ func TestSurveyStateNotice(t *testing.T) {
 	on, off := true, false
 	g := api.Guild{Timezone: "UTC", SurveyHour: 9, WorkingDays: []int{1, 2, 3, 4, 5}, SurveyEnabled: &on}
 	monday := time.Date(2026, 11, 2, 8, 0, 0, 0, time.UTC)
-	if got := surveyStateNotice(l, g, monday, true); !strings.Contains(got, "09:00") {
+	if got := surveyStateNotice(l, g, monday, true, false); !strings.Contains(got, "09:00") {
 		t.Errorf("before the hour: %q", got)
 	}
-	if got := surveyStateNotice(l, g, monday.Add(2*time.Hour), true); got != l.T("setup.started_now") {
+	if got := surveyStateNotice(l, g, monday.Add(2*time.Hour), true, false); got != l.T("setup.started_now") {
 		t.Errorf("after the hour: %q", got)
 	}
-	if got := surveyStateNotice(l, g, monday, false); got != l.T("setup.on") {
+	if got := surveyStateNotice(l, g, monday, false, false); got != l.T("setup.on") {
 		t.Errorf("without date: %q", got)
 	}
+	// Turned off and on again after today's went out: today's isn't sent again.
+	if got := surveyStateNotice(l, g, monday.Add(2*time.Hour), true, true); !strings.Contains(got, "09:00") || got == l.T("setup.started_now") {
+		t.Errorf("already sent today: %q", got)
+	}
+	if got := surveyStateNotice(l, g, monday.Add(2*time.Hour), false, true); got != l.T("setup.on") {
+		t.Errorf("already sent today, no date: %q", got)
+	}
 	g.SurveyEnabled = &off
-	if got := surveyStateNotice(l, g, monday, true); got != l.T("setup.stopped") {
+	if got := surveyStateNotice(l, g, monday, true, false); got != l.T("setup.stopped") {
 		t.Errorf("off: %q", got)
+	}
+}
+
+func TestAfterFirstLine(t *testing.T) {
+	if got := afterFirstLine("a\nb\nc", "x"); got != "a\nx\nb\nc" {
+		t.Errorf("got %q", got)
+	}
+	if got := afterFirstLine("a\nb", ""); got != "a\nb" {
+		t.Errorf("empty line: %q", got)
 	}
 }

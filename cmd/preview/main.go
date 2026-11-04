@@ -167,6 +167,8 @@ func writeButton(b *strings.Builder, btn discordgo.Button) {
 	switch btn.Style {
 	case discordgo.PrimaryButton:
 		class = "primary"
+	case discordgo.SuccessButton:
+		class = "success"
 	case discordgo.LinkButton:
 		label += " ↗"
 	}
@@ -252,7 +254,7 @@ code{background:#2b2d31;border-radius:4px;padding:0 3px;font-size:14px}
 .embed{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:16px}.embed>*{grid-column:1}.embed img.thumb{grid-column:2;grid-row:1/span 6;width:80px;height:80px;margin:8px 0 0;border-radius:4px}
 .eauthor{font-size:14px;font-weight:600;color:#f2f3f5;margin:8px 0 4px}.efields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}.fname{font-weight:600;color:#f2f3f5;margin-bottom:2px}
 .etitle{font-weight:700;color:#f2f3f5;font-size:16px;margin:4px 0 6px}.embed img{max-width:100%;border-radius:4px;margin-top:12px;display:block}.efoot{font-size:12px;color:#949ba4;margin-top:8px}
-.row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.btn{border-radius:3px;padding:2px 16px;height:32px;display:inline-flex;align-items:center;font-size:14px;font-weight:500;color:#fff;background:#4e5058}.btn.primary{background:#5865f2}
+.row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.btn{border-radius:3px;padding:2px 16px;height:32px;display:inline-flex;align-items:center;font-size:14px;font-weight:500;color:#fff;background:#4e5058}.btn.primary{background:#5865f2}.btn.success{background:#248046}
 .container{background:#2b2d31;border-left:4px solid;border-radius:8px;padding:12px 16px 16px;margin-top:4px;max-width:520px;font-size:15px}.container>.content{margin-top:8px}
 .container hr{border:0;border-top:1px solid #3f4147;margin:12px 0 4px}
 .select{flex:1;display:flex;justify-content:space-between;align-items:center;background:#1e1f22;border:1px solid #1e1f22;border-radius:4px;padding:8px 12px;font-size:14px;color:#dbdee1}.select.empty{color:#949ba4}.select i{font-style:normal;color:#b5bac1}

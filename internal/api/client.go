@@ -66,7 +66,11 @@ type Guild struct {
 	ReportFrequency string `json:"report_frequency"`
 	// ReportDM is false when the main admin chose to see reports only on the web. Missing (an
 	// older API) means true.
-	ReportDM       *bool  `json:"report_dm"`
+	ReportDM *bool `json:"report_dm"`
+	// SurveyEnabled is false while the server hasn't started the survey: nobody gets the survey
+	// or the game. A server the bot just joined starts with it off. Missing (an older API) means
+	// true.
+	SurveyEnabled  *bool  `json:"survey_enabled"`
 	Language       string `json:"language"`
 	KudosChannelID string `json:"kudos_channel_id"` // empty: where the command is used
 	GamesEnabled   bool   `json:"games_enabled"`
@@ -98,6 +102,9 @@ func (f RoleFilter) Everyone() bool { return f.Mode != RolesOnly && f.Mode != Ro
 // SendsReportDM reports whether the main admin gets the report as a DM.
 func (g Guild) SendsReportDM() bool { return g.ReportDM == nil || *g.ReportDM }
 
+// SendsSurvey reports whether the server started the survey, so members get it and the game.
+func (g Guild) SendsSurvey() bool { return g.SurveyEnabled == nil || *g.SurveyEnabled }
+
 type Member struct {
 	DiscordID string `json:"discord_user_id"`
 	Username  string `json:"username"`
@@ -120,6 +127,7 @@ type GuildPatch struct {
 	GamesEnabled    *bool       `json:"games_enabled,omitempty"`
 	WorkingDays     []int       `json:"working_days,omitempty"`
 	ReportDM        *bool       `json:"report_dm,omitempty"`
+	SurveyEnabled   *bool       `json:"survey_enabled,omitempty"`
 	SurveyRoles     *RoleFilter `json:"survey_roles,omitempty"`
 	GameRoles       *RoleFilter `json:"game_roles,omitempty"`
 }
@@ -370,6 +378,19 @@ func (c *Client) ClaimDispatch(ctx context.Context, guildID, kind, period string
 func (c *Client) FinishDispatch(ctx context.Context, guildID, kind, period string, recipients, failed int) error {
 	return c.do(ctx, http.MethodPut, "/v1/guilds/"+url.PathEscape(guildID)+"/dispatches/"+url.PathEscape(kind)+"/"+url.PathEscape(period),
 		map[string]int{"recipients": recipients, "failed": failed}, nil)
+}
+
+// DispatchSent reports whether the period was already claimed for sending. An older API without
+// this call answers an error.
+func (c *Client) DispatchSent(ctx context.Context, guildID, kind, period string) (bool, error) {
+	err := c.do(ctx, http.MethodGet, "/v1/guilds/"+url.PathEscape(guildID)+"/dispatches/"+url.PathEscape(kind)+"/"+url.PathEscape(period), nil, nil)
+	if errors.Is(err, ErrNotFound) {
+		var apiErr *Error
+		if errors.As(err, &apiErr) && apiErr.Message == "not dispatched" {
+			return false, nil
+		}
+	}
+	return err == nil, err
 }
 
 // ReleaseDispatch gives back a claimed send that reached nobody, so a later claim can retry it.

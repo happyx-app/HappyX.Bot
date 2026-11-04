@@ -44,6 +44,11 @@ report. One bot serves any number of servers; their data is kept apart by
 - **Setup assistant**: when the bot joins a server it DMs the owner a two-page assistant (survey,
   then report and extras) where every select saves at once; `/happyx setup` shows it again. It can
   send a test survey that saves nothing and post a short introduction of HappyX in a channel.
+- **Survey off until started**: a server the bot joins starts with the survey off, so nobody gets a
+  DM before the admin has set things up. «Start the survey» at the end of the assistant turns it on
+  (also `/happyx config survey:True` or the web settings); a survey started after its hour on a
+  working day goes out right away. While it is off there is no survey and no game; the report and
+  kudos work as usual. Servers that used HappyX before keep it on.
 - **Survey**: on the server's working days (Monday to Friday by default; `/happyx config working_days`
   offers common sets, the web any days), from the configured hour (default 13:00 Europe/Madrid) the bot DMs every active member
   a card (greeting, the anonymity notice, the server's icon) with five emoji buttons. After
@@ -87,7 +92,7 @@ report. One bot serves any number of servers; their data is kept apart by
 | `/happyx kudos` | everyone | `user`, `message` (≤300): publicly thank a teammate |
 | Apps › **Give kudos** | everyone | right-click a user or a message: the same kudos, text written in a form |
 | `/happyx setup` | manage | step-by-step setup assistant, only visible to whoever runs it |
-| `/happyx config` | manage | `anonymous`, `hour`, `timezone`, `frequency`, `language`, `admin`, `kudos_channel`, `working_days`, `games` |
+| `/happyx config` | manage | `anonymous`, `hour`, `timezone`, `frequency`, `language`, `admin`, `kudos_channel`, `working_days`, `games`, `survey` |
 | `/happyx report` | view | see the last completed period's report now, or the one in progress with `period:current` |
 
 **Who**: *view* and *manage* are given to users or roles on the dashboard. The HappyX admin (who

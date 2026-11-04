@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -39,6 +40,7 @@ const (
 	optKudosChan = "kudos_channel"
 	optGames     = "games"
 	optWorkDays  = "working_days"
+	optSurvey    = "survey"
 
 	periodLast    = "last"
 	periodCurrent = "current"
@@ -120,6 +122,7 @@ func commands() []*discordgo.ApplicationCommand {
 			sub(cmdKudos, kudosUser, kudosMessage),
 			sub(cmdSetup),
 			sub(cmdConfig,
+				opt(discordgo.ApplicationCommandOptionBoolean, optSurvey),
 				opt(discordgo.ApplicationCommandOptionBoolean, optAnonymous),
 				hour,
 				opt(discordgo.ApplicationCommandOptionString, optTimezone),
@@ -361,11 +364,12 @@ func (b *Bot) cmdStatus(ctx context.Context, i *discordgo.InteractionCreate, l *
 			you = l.T("status.receiving")
 		}
 	}
-	b.ephemeral(i, l.T("status.text",
+	text := l.T("status.text",
 		"days", workingDaysText(l, g.WorkingDays), "hour", fmt.Sprintf("%02d", g.SurveyHour), "timezone", g.Timezone,
 		"frequency", l.T("freq."+g.ReportFrequency), "admin", "<@"+g.AdminDiscordID+">",
 		"anonymous", yesNo(l, g.Anonymous), "language", i18n.Get(g.Language).Name,
-		"participants", len(recipients), "you", you)+reportDMLine(l, g)+"\n"+kudosChannelLine(l, g)+"\n"+gameLine(l, g))
+		"participants", len(recipients), "you", you)
+	b.ephemeral(i, afterFirstLine(text, b.surveyOffLine(l, g))+reportDMLine(l, g)+"\n"+kudosChannelLine(l, g)+"\n"+gameLine(l, g))
 }
 
 func (b *Bot) cmdConfig(ctx context.Context, i *discordgo.InteractionCreate, l *i18n.Locale, user *discordgo.User, opts []*discordgo.ApplicationCommandInteractionDataOption) {
@@ -408,6 +412,9 @@ func (b *Bot) cmdConfig(ctx context.Context, i *discordgo.InteractionCreate, l *
 			p.GamesEnabled = &v
 		case optWorkDays:
 			p.WorkingDays = presetDays(o.StringValue())
+		case optSurvey:
+			v := o.BoolValue()
+			p.SurveyEnabled = &v
 		}
 	}
 	g, err := b.api.UpdateGuild(ctx, i.GuildID, p)
@@ -418,7 +425,13 @@ func (b *Bot) cmdConfig(ctx context.Context, i *discordgo.InteractionCreate, l *
 	if p.Language != nil {
 		l = i18n.Get(g.Language) // confirm in the language just chosen
 	}
-	b.ephemeral(i, configSaved(l, g, p))
+	s := configSaved(l, g, p)
+	if p.SurveyEnabled != nil {
+		s += "\n" + b.surveyNotice(ctx, l, g, true)
+	} else if line := b.surveyOffLine(l, g); line != "" {
+		s += "\n" + line
+	}
+	b.ephemeral(i, s)
 }
 
 // configSaved confirms the new settings. When the change turned anonymity off, it adds that
@@ -540,6 +553,26 @@ func yesNo(l *i18n.Locale, v bool) string {
 		return l.T("yes")
 	}
 	return l.T("no")
+}
+
+// surveyOffLine says nobody gets the survey yet, while the server hasn't started it.
+func (b *Bot) surveyOffLine(l *i18n.Locale, g api.Guild) string {
+	if g.SendsSurvey() {
+		return ""
+	}
+	return l.T("status.survey_off", "command", b.setupMention())
+}
+
+// afterFirstLine puts line right under the first line of text (the survey's schedule), if any.
+func afterFirstLine(text, line string) string {
+	if line == "" {
+		return text
+	}
+	first, rest, ok := strings.Cut(text, "\n")
+	if !ok {
+		return text + "\n" + line
+	}
+	return first + "\n" + line + "\n" + rest
 }
 
 // reportDMLine says the report is not sent by DM, when the admin chose to see it only on the web.

@@ -92,3 +92,24 @@ func TestGameDue(t *testing.T) {
 		t.Error("question due before the survey hour")
 	}
 }
+
+func TestNextSurvey(t *testing.T) {
+	s := Settings{Timezone: "Europe/Madrid", SurveyHour: 13}
+	madrid, _ := time.LoadLocation("Europe/Madrid")
+	cases := []struct{ now, want string }{
+		{"2026-11-02 09:00", "2026-11-02 13:00"}, // Monday, before the hour
+		{"2026-11-02 13:00", "2026-11-03 13:00"}, // the hour itself has started
+		{"2026-11-06 15:00", "2026-11-09 13:00"}, // Friday afternoon skips the weekend
+		{"2026-11-07 10:00", "2026-11-09 13:00"}, // Saturday
+	}
+	for _, c := range cases {
+		now, _ := time.ParseInLocation("2006-01-02 15:04", c.now, madrid)
+		got, ok := NextSurvey(s, now)
+		if !ok || got.Format("2006-01-02 15:04") != c.want {
+			t.Errorf("NextSurvey(%s) = %s %v, want %s", c.now, got.Format("2006-01-02 15:04"), ok, c.want)
+		}
+	}
+	if _, ok := NextSurvey(Settings{Timezone: "UTC", WorkingDays: []int{}}, time.Now()); !ok {
+		t.Error("empty working days mean Monday to Friday")
+	}
+}

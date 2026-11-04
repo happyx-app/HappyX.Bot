@@ -2,6 +2,7 @@ package bot
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 
@@ -70,7 +71,7 @@ func Previews(code string) []Preview {
 		return &discordgo.MessageSend{Content: d.Content, Embeds: d.Embeds, Components: d.Components}
 	}
 
-	return []Preview{
+	return append([]Preview{
 		{Title: "Daily survey", Channel: "DM", Msg: surveyMessage(l, g, day, ana, PreviewGuildIcon)},
 		{Title: "Daily survey with the admin's own message", Channel: "DM", Msg: surveyMessage(l, custom, day, ana, PreviewGuildIcon)},
 		{Title: "Daily survey until the first answer since the privacy policy's date", Channel: "DM", Msg: surveyMessage(l, g, day, anaFirst, PreviewGuildIcon)},
@@ -105,6 +106,62 @@ func Previews(code string) []Preview {
 		{Title: "After proposing a question", Channel: "DM", Ephemeral: true, Msg: text(l.T("game.proposed_ok", "question", "¿Cuál fue tu primer concierto?"))},
 		{Title: "Proposing before Thursday", Channel: "DM", Ephemeral: true, Msg: text(l.T("game.propose_closed"))},
 		{Title: "Answering after Wednesday", Channel: "DM", Ephemeral: true, Msg: text(l.T("game.closed"))},
+	}, setupPreviews(l, g)...)
+}
+
+// setupPreviews are the setup assistant's pages, the introduction and the test survey.
+func setupPreviews(l *i18n.Locale, g api.Guild) []Preview {
+	v2 := func(c []discordgo.MessageComponent) *discordgo.MessageSend {
+		return &discordgo.MessageSend{Components: c, Flags: discordgo.MessageFlagsIsComponentsV2}
+	}
+	g.Name, g.KudosChannelID = "Equipo Producto", ""
+	roles := []*discordgo.Role{
+		{ID: PreviewGuildID, Name: "@everyone"},
+		{ID: "500000000000000001", Name: "Desarrollo", Position: 4},
+		{ID: "500000000000000002", Name: "Diseño", Position: 3},
+		{ID: "500000000000000003", Name: "Producto", Position: 2},
+		{ID: "500000000000000004", Name: "Invitados", Position: 1},
+		{ID: "500000000000000005", Name: "HappyX", Position: 5, Managed: true},
+	}
+	channels := []api.Channel{
+		{ID: PreviewGeneralID, Name: "general", CanPost: true},
+		{ID: PreviewChannelID, Name: "kudos", CanPost: false},
+		{ID: "400000000000000003", Name: "random", CanPost: true},
+	}
+	now := time.Date(2026, 11, 2, 8, 0, 0, 0, time.UTC) // a Monday morning
+	d := setupData{Guild: g, Roles: roles, Channels: channels, Recipients: 28, WebURL: "https://happyx.example.com", Now: now}
+
+	only := d
+	only.Guild.SurveyRoles = api.RoleFilter{Mode: api.RolesOnly, RoleIDs: []string{"500000000000000001", "500000000000000002"}}
+	only.Recipients = 16
+	picking := d
+	page2 := only
+	page2.Guild.KudosChannelID, page2.Guild.GamesEnabled = PreviewChannelID, true
+	choosing := page2
+	choosing.present = (&Bot{}).presentSelect(l, choosing)
+	done := page2
+	done.Notice = l.T("setup.present_done", "channel", "general")
+
+	named := page2.Guild
+	named.Anonymous = false
+	who := joinAnd(l, []string{"Desarrollo", "Diseño"})
+	pause := "`/happyx " + cmdPause + "`"
+	test := (&Bot{now: func() time.Time { return now }}).testSurveyFor(l, g, surveyRecipient{ID: PreviewAnaID, Name: "Ana"}, PreviewGuildIcon)
+	answered := testAnswered(l, g, "Ana", 4)
+
+	return []Preview{
+		{Title: "Setup assistant, page 1 (DM to the owner when the bot joins)", Channel: "DM", Msg: v2(setupComponents(l, d, "1"))},
+		{Title: "Setup: picking roles for «Only these roles»", Channel: "DM", Msg: v2(setupComponents(l, picking, "1o"))},
+		{Title: "Setup: only some roles get the survey", Channel: "DM", Msg: v2(setupComponents(l, only, "1"))},
+		{Title: "Setup, page 2 (kudos channel without permission, game on)", Channel: "DM", Msg: v2(setupComponents(l, page2, "2"))},
+		{Title: "Setup: choosing where to introduce HappyX", Channel: "DM", Msg: v2(setupComponents(l, choosing, "2c"))},
+		{Title: "Setup: HappyX introduced", Channel: "DM", Msg: v2(setupComponents(l, done, "2"))},
+		{Title: "/happyx setup in a server", Channel: "#general", Command: "/happyx " + cmdSetup, Ephemeral: true, Msg: v2(setupComponents(l, d, "1"))},
+		{Title: "Introduction (anonymous, only some roles, game on)", Channel: "#general", Msg: v2(introComponents(l, page2.Guild, who, "alex", pause))},
+		{Title: "Introduction (with names, everyone)", Channel: "#general", Msg: v2(introComponents(l, named, l.T("intro.who_all"), "alex", pause))},
+		{Title: "Test survey (Try the survey)", Channel: "#general", Ephemeral: true, Msg: test},
+		{Title: "Test survey answered (nothing saved)", Channel: "#general", Ephemeral: true,
+			Msg: &discordgo.MessageSend{Embeds: answered.Embeds, Components: answered.Components}},
 	}
 }
 

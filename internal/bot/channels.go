@@ -10,6 +10,11 @@ import (
 	"github.com/happyx-app/HappyX.Bot/internal/api"
 )
 
+// channelObfuscated is the flag Discord sets, over the gateway, on a channel the bot can't view.
+// Its name then reads "___hidden___", so the channel is useless to list. From 2026-11-16 it
+// applies to every bot; the HTTP API leaves such channels out altogether.
+const channelObfuscated = 1 << 17
+
 // kudosPermissions is what posting the kudos card takes.
 const kudosPermissions = discordgo.PermissionViewChannel | discordgo.PermissionSendMessages | discordgo.PermissionEmbedLinks
 
@@ -40,12 +45,17 @@ func (b *Bot) syncChannels(ctx context.Context, guildID string) {
 
 // channelList keeps the text and announcement channels in the order Discord's sidebar shows
 // them: those outside a category first, then each category's, categories in their own order.
+// Channels hidden from the bot are left out: their names are not real, and a kudos channel the
+// bot can't see goes back to posting where the command is used.
 func channelList(channels []*discordgo.Channel, canPost func(channelID string) bool) []api.Channel {
 	byPosition := func(a, b *discordgo.Channel) int {
 		return cmp.Or(cmp.Compare(a.Position, b.Position), cmp.Compare(len(a.ID), len(b.ID)), cmp.Compare(a.ID, b.ID))
 	}
 	var categories, texts []*discordgo.Channel
 	for _, c := range channels {
+		if c.Flags&channelObfuscated != 0 {
+			continue
+		}
 		switch c.Type {
 		case discordgo.ChannelTypeGuildCategory:
 			categories = append(categories, c)

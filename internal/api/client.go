@@ -73,8 +73,27 @@ type Guild struct {
 	WorkingDays    []int  `json:"working_days"` // ISO days the survey goes out, 1 is Monday
 	// SurveyMessage is the admin's own survey text with {{placeholders}}; empty means the default.
 	SurveyMessage string `json:"survey_message"`
-	Active        bool   `json:"active"`
+	// SurveyRoles and GameRoles narrow by role who gets the survey and who plays the game.
+	SurveyRoles RoleFilter `json:"survey_roles"`
+	GameRoles   RoleFilter `json:"game_roles"`
+	Active      bool       `json:"active"`
 }
+
+// RoleFilter modes: everyone, only members with one of the roles, or everyone but them.
+const (
+	RolesEveryone = "all"
+	RolesOnly     = "only"
+	RolesExcept   = "except"
+)
+
+// RoleFilter narrows a setting to some Discord roles. RoleIDs is empty with RolesEveryone.
+type RoleFilter struct {
+	Mode    string   `json:"mode"`
+	RoleIDs []string `json:"role_ids"`
+}
+
+// Everyone reports whether the filter lets every member in, as an older API's empty one does.
+func (f RoleFilter) Everyone() bool { return f.Mode != RolesOnly && f.Mode != RolesExcept }
 
 // SendsReportDM reports whether the main admin gets the report as a DM.
 func (g Guild) SendsReportDM() bool { return g.ReportDM == nil || *g.ReportDM }
@@ -91,15 +110,18 @@ type Member struct {
 }
 
 type GuildPatch struct {
-	Anonymous       *bool   `json:"anonymous,omitempty"`
-	Timezone        *string `json:"timezone,omitempty"`
-	SurveyHour      *int    `json:"survey_hour,omitempty"`
-	ReportFrequency *string `json:"report_frequency,omitempty"`
-	AdminDiscordID  *string `json:"admin_discord_user_id,omitempty"`
-	Language        *string `json:"language,omitempty"`
-	KudosChannelID  *string `json:"kudos_channel_id,omitempty"`
-	GamesEnabled    *bool   `json:"games_enabled,omitempty"`
-	WorkingDays     []int   `json:"working_days,omitempty"`
+	Anonymous       *bool       `json:"anonymous,omitempty"`
+	Timezone        *string     `json:"timezone,omitempty"`
+	SurveyHour      *int        `json:"survey_hour,omitempty"`
+	ReportFrequency *string     `json:"report_frequency,omitempty"`
+	AdminDiscordID  *string     `json:"admin_discord_user_id,omitempty"`
+	Language        *string     `json:"language,omitempty"`
+	KudosChannelID  *string     `json:"kudos_channel_id,omitempty"`
+	GamesEnabled    *bool       `json:"games_enabled,omitempty"`
+	WorkingDays     []int       `json:"working_days,omitempty"`
+	ReportDM        *bool       `json:"report_dm,omitempty"`
+	SurveyRoles     *RoleFilter `json:"survey_roles,omitempty"`
+	GameRoles       *RoleFilter `json:"game_roles,omitempty"`
 }
 
 type Report struct {

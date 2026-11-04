@@ -45,6 +45,21 @@ func SurveyDue(s Settings, now time.Time) (day string, due bool) {
 	return local.Format(DateLayout), s.Works(local.Weekday()) && local.Hour() >= s.SurveyHour
 }
 
+// NextSurvey is when the next survey is due to start: the survey hour of the first working day
+// after now, in the guild's timezone. Today counts only while its hour is still ahead. ok is
+// false when no day of the week is a working day.
+func NextSurvey(s Settings, now time.Time) (next time.Time, ok bool) {
+	local := now.In(s.location())
+	for d := 0; d <= 7; d++ {
+		day := local.AddDate(0, 0, d)
+		at := time.Date(day.Year(), day.Month(), day.Day(), s.SurveyHour, 0, 0, 0, local.Location())
+		if at.After(local) && s.Works(at.Weekday()) {
+			return at, true
+		}
+	}
+	return time.Time{}, false
+}
+
 // ReportDue reports whether the report for the last complete period should go out. It is due
 // on the first day of the new period (Monday, or the 1st of the month) from the survey hour on.
 // from and to are the inclusive dates of the period to report.

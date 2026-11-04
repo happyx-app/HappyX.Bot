@@ -330,13 +330,15 @@ func (b *Bot) tick(ctx context.Context) {
 	}
 	for _, g := range guilds {
 		st := schedule.Settings{Timezone: g.Timezone, SurveyHour: g.SurveyHour, ReportFrequency: g.ReportFrequency, WorkingDays: g.WorkingDays}
-		if day, due := schedule.SurveyDue(st, now); due {
+		// Until the admin starts the survey, members get neither the survey nor the game.
+		surveyOn := g.SendsSurvey()
+		if day, due := schedule.SurveyDue(st, now); due && surveyOn {
 			b.dispatch(ctx, g, "survey", day, func() (delivery, error) { return b.sendSurvey(ctx, g, day) })
 		}
 		if from, to, due := schedule.ReportDue(st, now); due && g.SendsReportDM() {
 			b.dispatch(ctx, g, "report", from, func() (delivery, error) { return b.sendReport(ctx, g, from, to) })
 		}
-		if !g.GamesEnabled {
+		if !g.GamesEnabled || !surveyOn {
 			continue
 		}
 		if week, due := schedule.GameQuestionDue(st, now); due {

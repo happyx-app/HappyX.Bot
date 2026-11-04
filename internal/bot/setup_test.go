@@ -1,7 +1,9 @@
 package bot
 
 import (
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 
@@ -55,6 +57,12 @@ func TestSetupPatch(t *testing.T) {
 	if len(p.WorkingDays) != 5 || p.WorkingDays[0] != 7 {
 		t.Fatalf("days: %v", p.WorkingDays)
 	}
+	for action, want := range map[string]bool{setupStart: true, setupStop: false} {
+		p, _, save, ok := setupPatch(setupID{Action: action, GuildID: g, Page: "2"}, nil)
+		if !ok || !save || p.SurveyEnabled == nil || *p.SurveyEnabled != want {
+			t.Fatalf("%s: %+v save %v ok %v", action, p.SurveyEnabled, save, ok)
+		}
+	}
 	for _, c := range []struct{ action, v string }{{setupHour, "24"}, {setupDays, "custom"}, {setupFrequency, "daily"}, {setupWho, "some"}} {
 		if _, _, _, ok := setupPatch(setupID{Action: c.action, GuildID: g, Page: "1"}, []string{c.v}); ok {
 			t.Errorf("%s=%s accepted", c.action, c.v)
@@ -105,5 +113,26 @@ func TestRoleSelectSkipsEveryoneAndBots(t *testing.T) {
 		if o.Value == "1" || o.Value == "2" {
 			t.Errorf("listed %q", o.Value)
 		}
+	}
+}
+
+// TestSurveyStateNotice checks starting the survey says when the first one goes out.
+func TestSurveyStateNotice(t *testing.T) {
+	l := i18n.Get("es")
+	on, off := true, false
+	g := api.Guild{Timezone: "UTC", SurveyHour: 9, WorkingDays: []int{1, 2, 3, 4, 5}, SurveyEnabled: &on}
+	monday := time.Date(2026, 11, 2, 8, 0, 0, 0, time.UTC)
+	if got := surveyStateNotice(l, g, monday, true); !strings.Contains(got, "09:00") {
+		t.Errorf("before the hour: %q", got)
+	}
+	if got := surveyStateNotice(l, g, monday.Add(2*time.Hour), true); got != l.T("setup.started_now") {
+		t.Errorf("after the hour: %q", got)
+	}
+	if got := surveyStateNotice(l, g, monday, false); got != l.T("setup.on") {
+		t.Errorf("without date: %q", got)
+	}
+	g.SurveyEnabled = &off
+	if got := surveyStateNotice(l, g, monday, true); got != l.T("setup.stopped") {
+		t.Errorf("off: %q", got)
 	}
 }

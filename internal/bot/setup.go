@@ -51,6 +51,8 @@ const (
 	setupGameRoles = "gameroles" // select: game roles
 	setupTry       = "try"       // button: send a survey that isn't saved
 	setupPresent   = "present"   // select: the channel to introduce HappyX in
+	setupStart     = "start"     // button: start the survey
+	setupStop      = "stop"      // button: turn the survey off
 )
 
 func (s setupID) String() string {
@@ -133,7 +135,7 @@ func setupComponents(l *i18n.Locale, d setupData, page string) []discordgo.Messa
 	var c []discordgo.MessageComponent
 	if page[0] == '1' {
 		c = append(c,
-			text("-# "+l.T("setup.page1")+"\n### "+l.T("setup.title", "guild", g.Name)+"\n"+l.T("setup.saves")),
+			text("-# "+l.T("setup.page1")+"\n### "+l.T("setup.title", "guild", g.Name)+"\n"+l.T("setup.saves")+offHint(l, g)),
 			sep,
 			label(l.T("setup.language")), sel(setupLanguage, l.T("setup.language"), languageOptions(g.Language)),
 			label(l.T("setup.answers")), sel(setupAnonymous, l.T("setup.answers"), []discordgo.SelectMenuOption{
@@ -190,7 +192,9 @@ func setupComponents(l *i18n.Locale, d setupData, page string) []discordgo.Messa
 		}
 		c = append(c, sep)
 		st := schedule.Settings{Timezone: g.Timezone, SurveyHour: g.SurveyHour, WorkingDays: g.WorkingDays}
-		if next, ok := schedule.NextSurvey(st, d.Now); ok {
+		if !g.SendsSurvey() {
+			c = append(c, text(l.T("setup.off")))
+		} else if next, ok := schedule.NextSurvey(st, d.Now); ok {
 			c = append(c, text(l.T("setup.next_survey", "date", longDate(l, next), "hour", fmt.Sprintf("%02d", g.SurveyHour))))
 		}
 		c = append(c, text("-# "+l.T("setup.web")))
@@ -204,6 +208,11 @@ func setupComponents(l *i18n.Locale, d setupData, page string) []discordgo.Messa
 			buttons = append(buttons, discordgo.Button{Label: l.T("setup.present"), Style: discordgo.SecondaryButton,
 				CustomID: setupID{Action: setupPage, GuildID: g.DiscordID, Page: "2c"}.String()})
 		}
+		if g.SendsSurvey() {
+			buttons = append(buttons, discordgo.Button{Label: l.T("setup.stop"), Style: discordgo.SecondaryButton, CustomID: id(setupStop)})
+		} else {
+			buttons = append(buttons, discordgo.Button{Label: l.T("setup.start"), Style: discordgo.SuccessButton, CustomID: id(setupStart)})
+		}
 		if d.WebURL != "" {
 			buttons = append(buttons, discordgo.Button{Label: l.T("setup.open_web"), Style: discordgo.LinkButton, URL: d.WebURL})
 		}
@@ -214,6 +223,34 @@ func setupComponents(l *i18n.Locale, d setupData, page string) []discordgo.Messa
 	}
 	color := surveyColor
 	return []discordgo.MessageComponent{discordgo.Container{AccentColor: &color, Components: c}}
+}
+
+// offHint tells the admin, on the first page, that the survey waits for them to start it.
+func offHint(l *i18n.Locale, g api.Guild) string {
+	if g.SendsSurvey() {
+		return ""
+	}
+	return "\n" + l.T("setup.off_hint")
+}
+
+// surveyStateNotice confirms the survey was started or turned off. A survey started after its
+// hour on a working day goes out right away. withDate adds when the first one comes, for
+// replies that don't show the next survey already.
+func surveyStateNotice(l *i18n.Locale, g api.Guild, now time.Time, withDate bool) string {
+	if !g.SendsSurvey() {
+		return l.T("setup.stopped")
+	}
+	st := schedule.Settings{Timezone: g.Timezone, SurveyHour: g.SurveyHour, WorkingDays: g.WorkingDays}
+	if _, due := schedule.SurveyDue(st, now); due {
+		return l.T("setup.started_now")
+	}
+	if !withDate {
+		return l.T("setup.on")
+	}
+	if next, ok := schedule.NextSurvey(st, now); ok {
+		return l.T("setup.started", "date", longDate(l, next), "hour", fmt.Sprintf("%02d", g.SurveyHour))
+	}
+	return ""
 }
 
 // filterMode is the filter's mode, or the one being picked when the page says so.
@@ -444,6 +481,9 @@ func setupPatch(id setupID, values []string) (p api.GuildPatch, page string, sav
 		p.KudosChannelID = &v
 	case setupGames:
 		p.GamesEnabled = &yes
+	case setupStart, setupStop:
+		on := id.Action == setupStart
+		p.SurveyEnabled = &on
 	default:
 		return p, page, false, false
 	}
@@ -581,6 +621,9 @@ func (b *Bot) handleSetup(ctx context.Context, i *discordgo.InteractionCreate, i
 			if p.Language != nil {
 				l = i18n.Get(g.Language) // redraw in the language just chosen
 			}
+			if p.SurveyEnabled != nil {
+				notice = surveyStateNotice(l, g, b.now(), false)
+			}
 		}
 	}
 	d, _ := b.setupData(ctx, id.GuildID, g)
@@ -715,6 +758,14 @@ func joinAnd(l *i18n.Locale, names []string) string {
 }
 
 // pauseMention is a clickable /happyx pause, which Discord shows in each user's language.
+// setupMention is /happyx setup as a clickable command when its ID is known.
+func (b *Bot) setupMention() string {
+	if id := b.commandID.Load(); id != nil {
+		return fmt.Sprintf("</happyx %s:%s>", cmdSetup, *id)
+	}
+	return "`/happyx " + cmdSetup + "`"
+}
+
 func (b *Bot) pauseMention() string {
 	if id := b.commandID.Load(); id != nil {
 		return fmt.Sprintf("</happyx %s:%s>", cmdPause, *id)

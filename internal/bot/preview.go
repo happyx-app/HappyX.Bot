@@ -115,6 +115,8 @@ func setupPreviews(l *i18n.Locale, g api.Guild) []Preview {
 		return &discordgo.MessageSend{Components: c, Flags: discordgo.MessageFlagsIsComponentsV2}
 	}
 	g.Name, g.KudosChannelID = "Equipo Producto", ""
+	off := false
+	g.SurveyEnabled = &off // a server the bot just joined
 	roles := []*discordgo.Role{
 		{ID: PreviewGuildID, Name: "@everyone"},
 		{ID: "500000000000000001", Name: "Desarrollo", Position: 4},
@@ -141,6 +143,10 @@ func setupPreviews(l *i18n.Locale, g api.Guild) []Preview {
 	choosing.present = (&Bot{}).presentSelect(l, choosing)
 	done := page2
 	done.Notice = l.T("setup.present_done", "channel", "general")
+	on := true
+	started := done
+	started.Guild.SurveyEnabled = &on
+	started.Notice = surveyStateNotice(l, started.Guild, now, false)
 
 	named := page2.Guild
 	named.Anonymous = false
@@ -156,6 +162,7 @@ func setupPreviews(l *i18n.Locale, g api.Guild) []Preview {
 		{Title: "Setup, page 2 (kudos channel without permission, game on)", Channel: "DM", Msg: v2(setupComponents(l, page2, "2"))},
 		{Title: "Setup: choosing where to introduce HappyX", Channel: "DM", Msg: v2(setupComponents(l, choosing, "2c"))},
 		{Title: "Setup: HappyX introduced", Channel: "DM", Msg: v2(setupComponents(l, done, "2"))},
+		{Title: "Setup: survey started", Channel: "DM", Msg: v2(setupComponents(l, started, "2"))},
 		{Title: "/happyx setup in a server", Channel: "#general", Command: "/happyx " + cmdSetup, Ephemeral: true, Msg: v2(setupComponents(l, d, "1"))},
 		{Title: "Introduction (anonymous, only some roles, game on)", Channel: "#general", Msg: v2(introComponents(l, page2.Guild, who, "alex", pause))},
 		{Title: "Introduction (with names, everyone)", Channel: "#general", Msg: v2(introComponents(l, named, l.T("intro.who_all"), "alex", pause))},

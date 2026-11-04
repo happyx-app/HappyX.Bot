@@ -66,7 +66,11 @@ type Guild struct {
 	ReportFrequency string `json:"report_frequency"`
 	// ReportDM is false when the main admin chose to see reports only on the web. Missing (an
 	// older API) means true.
-	ReportDM       *bool  `json:"report_dm"`
+	ReportDM *bool `json:"report_dm"`
+	// SurveyEnabled is false while the server hasn't started the survey: nobody gets the survey
+	// or the game. A server the bot just joined starts with it off. Missing (an older API) means
+	// true.
+	SurveyEnabled  *bool  `json:"survey_enabled"`
 	Language       string `json:"language"`
 	KudosChannelID string `json:"kudos_channel_id"` // empty: where the command is used
 	GamesEnabled   bool   `json:"games_enabled"`
@@ -98,6 +102,9 @@ func (f RoleFilter) Everyone() bool { return f.Mode != RolesOnly && f.Mode != Ro
 // SendsReportDM reports whether the main admin gets the report as a DM.
 func (g Guild) SendsReportDM() bool { return g.ReportDM == nil || *g.ReportDM }
 
+// SendsSurvey reports whether the server started the survey, so members get it and the game.
+func (g Guild) SendsSurvey() bool { return g.SurveyEnabled == nil || *g.SurveyEnabled }
+
 type Member struct {
 	DiscordID string `json:"discord_user_id"`
 	Username  string `json:"username"`
@@ -120,6 +127,7 @@ type GuildPatch struct {
 	GamesEnabled    *bool       `json:"games_enabled,omitempty"`
 	WorkingDays     []int       `json:"working_days,omitempty"`
 	ReportDM        *bool       `json:"report_dm,omitempty"`
+	SurveyEnabled   *bool       `json:"survey_enabled,omitempty"`
 	SurveyRoles     *RoleFilter `json:"survey_roles,omitempty"`
 	GameRoles       *RoleFilter `json:"game_roles,omitempty"`
 }

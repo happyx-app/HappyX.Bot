@@ -446,6 +446,12 @@ func (b *Bot) sendReport(ctx context.Context, g api.Guild, from, to string) (del
 	if err != nil {
 		return delivery{}, err
 	}
+	// A period without a single answer or kudo has nothing to report, for example while the
+	// survey is off: the admin gets no DM for it.
+	if r.Responses == 0 && r.Kudos.Count == 0 {
+		b.log.Info("report skipped: nothing in the period", "guild", g.DiscordID, "from", from, "to", to)
+		return delivery{}, nil
+	}
 	if err := b.dm(g.AdminDiscordID, reportMessage(i18n.Get(g.Language), g, r)); err != nil {
 		return delivery{recipients: 1, failed: 1}, err
 	}

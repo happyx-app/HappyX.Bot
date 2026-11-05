@@ -330,7 +330,7 @@ func (b *Bot) tick(ctx context.Context) {
 	}
 	for _, g := range guilds {
 		st := schedule.Settings{Timezone: g.Timezone, SurveyHour: g.SurveyHour, ReportFrequency: g.ReportFrequency, WorkingDays: g.WorkingDays}
-		// Until the admin starts the survey, members get neither the survey nor the game.
+		// Until the admin starts the survey, members get neither the survey nor the game's DMs.
 		surveyOn := g.SendsSurvey()
 		if day, due := schedule.SurveyDue(st, now); due && surveyOn {
 			b.dispatch(ctx, g, "survey", day, func() (delivery, error) { return b.sendSurvey(ctx, g, day) })
@@ -338,7 +338,15 @@ func (b *Bot) tick(ctx context.Context) {
 		if from, to, due := schedule.ReportDue(st, now); due && g.SendsReportDM() {
 			b.dispatch(ctx, g, "report", from, func() (delivery, error) { return b.sendReport(ctx, g, from, to) })
 		}
-		if !g.GamesEnabled || !surveyOn {
+		if !g.GamesEnabled {
+			continue
+		}
+		if !surveyOn {
+			// With the survey off nobody gets the game's DMs, but the round still starts:
+			// the team plays it on the web.
+			if week, due := schedule.GameQuestionDue(st, now); due {
+				b.startQuietRound(ctx, g, week)
+			}
 			continue
 		}
 		if week, due := schedule.GameQuestionDue(st, now); due {
@@ -398,6 +406,24 @@ func (b *Bot) dispatch(ctx context.Context, g api.Guild, kind, period string, se
 		return
 	}
 	b.log.Info("dispatched", "guild", g.DiscordID, "kind", kind, "period", period, "recipients", d.recipients, "failed", d.failed)
+}
+
+// startQuietRound starts the week's «Who's who?» round without sending any DM. Starting a round
+// that exists returns it, so a retry is harmless; a round started or refused is not asked again
+// for a day.
+func (b *Bot) startQuietRound(ctx context.Context, g api.Guild, week string) {
+	key := g.DiscordID + "/game-web/" + week
+	now := b.now()
+	if now.Before(b.skip[key]) {
+		return
+	}
+	_, err := b.api.StartGameRound(ctx, g.DiscordID, week, gameQuestion(i18n.Get(g.Language), week))
+	if err != nil && !errors.Is(err, api.ErrConflict) {
+		b.log.Error("start game round", "guild", g.DiscordID, "week", week, "err", err)
+		b.skip[key] = now.Add(retryAfter)
+		return
+	}
+	b.skip[key] = now.Add(skipDone)
 }
 
 func (b *Bot) sendSurvey(ctx context.Context, g api.Guild, day string) (delivery, error) {

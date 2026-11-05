@@ -112,7 +112,8 @@ func (b *Bot) onReady(s *discordgo.Session, r *discordgo.Ready) {
 func (b *Bot) onGuildCreate(s *discordgo.Session, e *discordgo.GuildCreate) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	if _, err := b.api.RegisterGuild(ctx, e.ID, e.Name, e.OwnerID); errors.Is(err, api.ErrGone) {
+	g, err := b.api.RegisterGuild(ctx, e.ID, e.Name, e.OwnerID)
+	if errors.Is(err, api.ErrGone) {
 		b.leave(ctx, e.ID) // deleted from HappyX while the bot was offline
 		return
 	} else if err != nil {
@@ -128,7 +129,22 @@ func (b *Bot) onGuildCreate(s *discordgo.Session, e *discordgo.GuildCreate) {
 	}
 	b.log.Info("guild ready", "guild", e.ID, "name", e.Name, "members", n)
 	if b.justJoined(e.ID, e.JoinedAt) {
-		b.sendSetup(ctx, e.ID, e.OwnerID) // after the sync, so it can count who gets the survey
+		b.adoptLocale(ctx, g, e.PreferredLocale) // before the setup, so it comes in that language
+		b.sendSetup(ctx, e.ID, e.OwnerID)        // after the sync, so it can count who gets the survey
+	}
+}
+
+// adoptLocale sets a server the bot just joined to the language of its Discord community
+// locale, when HappyX has it, instead of English. A server already set to another language (one
+// that removed and added the bot again) keeps it.
+func (b *Bot) adoptLocale(ctx context.Context, g api.Guild, discordLocale string) {
+	l, ok := i18n.FromDiscord(discordLocale)
+	if !ok || l.Code == g.Language || g.Language != i18n.Default {
+		return
+	}
+	code := l.Code
+	if _, err := b.api.UpdateGuild(ctx, g.DiscordID, api.GuildPatch{Language: &code}); err != nil {
+		b.log.Error("set language from the server locale", "guild", g.DiscordID, "err", err)
 	}
 }
 

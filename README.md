@@ -54,6 +54,9 @@ report. One bot serves any number of servers; their data is kept apart by
   a card (greeting, the anonymity notice, the server's icon) with five emoji buttons. After
   answering, the card shows their mood, and they can add a comment. Answering again the same day replaces the answer.
   A **Don't ask me again** button under the survey stops it for that server (same as `/happyx pause`).
+  On vacation (`/happyx vacation`, or the web) nobody gets the survey or the game. An admin can set
+  a member's vacation on the web if they forgot; the bot then tells them by DM, with a link to
+  remove it.
   Admins can write their own survey text on the web (variables like `{{user.name}}`, `{{user.streak}}`
   or `{{date}}` are filled in per person). It goes out as written in place of the greeting; the rest
   of the card and the buttons are always added, and its mentions never ping anyone.
@@ -88,7 +91,8 @@ report. One bot serves any number of servers; their data is kept apart by
 | Command | Who | What |
 | --- | --- | --- |
 | `/happyx status` | everyone | settings and whether you receive the survey |
-| `/happyx pause` / `/happyx resume` | everyone | stop / resume receiving the survey in this server |
+| `/happyx pause` / `/happyx resume` | everyone | stop / resume receiving the survey in this server; resume also ends a vacation |
+| `/happyx vacation from to` | everyone | no survey or game from the first day to the last, in every server (dates day first: `20/12`, `20/12/2026` or `2026-12-20`; at most 90 days). Those days don't count against participation or the streak |
 | `/happyx kudos` | everyone | `user`, `message` (≤300): publicly thank a teammate |
 | Apps › **Give kudos** | everyone | right-click a user or a message: the same kudos, text written in a form |
 | `/happyx setup` | manage | step-by-step setup assistant, only visible to whoever runs it |

@@ -241,5 +241,17 @@
   "intro.named": "**👁 Mit Namen.** {admin} sieht, wer was geantwortet hat.",
   "intro.game": "🎲 Außerdem gibt es jede Woche das Spiel «Wer ist wer?».",
   "intro.pause": "Wer sie nicht bekommen möchte, nutzt {cmd}.",
-  "test.note": "Test: wird nicht gespeichert."
+  "test.note": "Test: wird nicht gespeichert.",
+  "cmd.vacation.name": "urlaub",
+  "cmd.vacation.description": "Ein paar Tage keine Umfrage und kein Spiel",
+  "opt.from.name": "von",
+  "opt.from.description": "Erster Urlaubstag, Tag zuerst: 20.12 oder 20.12.2026",
+  "opt.to.name": "bis",
+  "opt.to.description": "Letzter Urlaubstag, Tag zuerst: 6.1 oder 6.1.2027",
+  "vacation.done": "🌴 Urlaub vom {from} bis {to}: an diesen Tagen bekommst du in keinem Server die Umfrage oder das Spiel. Früher zurück? {resume_cmd}.",
+  "vacation.bad_date": "Ich verstehe «{date}» nicht. Schreib zuerst den Tag, etwa 20.12 oder 20.12.2026.",
+  "vacation.invalid": "Prüf die Daten: Der letzte Tag darf nicht vor dem ersten oder vor heute liegen, und es sind höchstens {max} Tage.",
+  "vacation.notice": "🌴 {admin} hat dir in **{server}** Urlaub vom {from} bis {to} eingetragen: an diesen Tagen bekommst du von diesem Server weder die Umfrage noch das Spiel. Falls das nicht stimmt, entferne ihn unter {link}.",
+  "status.vacation": "**Urlaub:** {from} bis {to}",
+  "status.on_vacation": "im Urlaub"
 }

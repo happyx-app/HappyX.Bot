@@ -241,5 +241,17 @@
   "intro.named": "**👁 Avec nom.** {admin} voit qui a répondu quoi.",
   "intro.game": "🎲 Chaque semaine, il y a aussi le jeu « Qui est qui ? ».",
   "intro.pause": "Si vous ne voulez pas le recevoir, utilisez {cmd}.",
-  "test.note": "Test : non enregistré."
+  "test.note": "Test : non enregistré.",
+  "cmd.vacation.name": "vacances",
+  "cmd.vacation.description": "Pas de sondage ni de jeu pendant quelques jours",
+  "opt.from.name": "du",
+  "opt.from.description": "Premier jour de vacances, le jour d'abord : 20/12 ou 20/12/2026",
+  "opt.to.name": "au",
+  "opt.to.description": "Dernier jour de vacances, le jour d'abord : 6/1 ou 6/1/2027",
+  "vacation.done": "🌴 Vacances du {from} au {to} : ces jours-là, tu ne recevras ni le sondage ni le jeu, sur aucun serveur. Pour revenir plus tôt, {resume_cmd}.",
+  "vacation.bad_date": "Je ne comprends pas « {date} ». Écris d'abord le jour, comme 20/12 ou 20/12/2026.",
+  "vacation.invalid": "Vérifie les dates : le dernier jour ne peut pas être avant le premier ni avant aujourd'hui, et c'est {max} jours au maximum.",
+  "vacation.notice": "🌴 {admin} t'a mis en vacances sur **{server}** du {from} au {to} : ces jours-là, tu ne recevras ni le sondage ni le jeu de ce serveur. Si ce n'est pas le cas, retire-les sur {link}.",
+  "status.vacation": "**Vacances :** du {from} au {to}",
+  "status.on_vacation": "en vacances"
 }

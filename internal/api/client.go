@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 )
 
@@ -499,4 +500,53 @@ func (c *Client) do(ctx context.Context, method, path string, in, out any) error
 		return json.NewDecoder(res.Body).Decode(out)
 	}
 	return nil
+}
+
+// Vacation is one stretch of days, both included, when the member gets no survey or game. Guild
+// is "" for the member's own, which applies in every server.
+type Vacation struct {
+	From       string `json:"from"` // YYYY-MM-DD
+	To         string `json:"to"`
+	GuildID    string `json:"discord_guild_id"`
+	SetByAdmin bool   `json:"set_by_admin"`
+}
+
+// Vacations lists the vacations that apply to the member in the server and haven't ended.
+func (c *Client) Vacations(ctx context.Context, guildID, userID string) ([]Vacation, error) {
+	var vs []Vacation
+	err := c.do(ctx, http.MethodGet, memberPath(guildID, userID)+"/vacations", nil, &vs)
+	return vs, err
+}
+
+// SetVacation sets the member's own vacation, for every server, with the dates as YYYY-MM-DD.
+func (c *Client) SetVacation(ctx context.Context, guildID, userID, from, to string) (Vacation, error) {
+	var v Vacation
+	err := c.do(ctx, http.MethodPut, memberPath(guildID, userID)+"/vacation", map[string]string{"from": from, "to": to}, &v)
+	return v, err
+}
+
+// EndVacations ends the member's own vacation and the one an admin set for them in the server.
+func (c *Client) EndVacations(ctx context.Context, guildID, userID string) error {
+	return c.do(ctx, http.MethodDelete, memberPath(guildID, userID)+"/vacations", nil, nil)
+}
+
+// VacationNotice is a vacation an admin set on the dashboard, which the bot tells the member about.
+type VacationNotice struct {
+	ID      int64  `json:"id"`
+	GuildID string `json:"discord_guild_id"`
+	UserID  string `json:"discord_user_id"`
+	SetByID string `json:"set_by_discord_user_id"`
+	From    string `json:"from"`
+	To      string `json:"to"`
+}
+
+func (c *Client) VacationNotices(ctx context.Context) ([]VacationNotice, error) {
+	var ns []VacationNotice
+	err := c.do(ctx, http.MethodGet, "/v1/vacation-notices", nil, &ns)
+	return ns, err
+}
+
+// DoneVacationNotice tells the API the member was told, or can't be (DMs closed).
+func (c *Client) DoneVacationNotice(ctx context.Context, id int64) error {
+	return c.do(ctx, http.MethodDelete, "/v1/vacation-notices/"+strconv.FormatInt(id, 10), nil, nil)
 }

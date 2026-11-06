@@ -317,6 +317,7 @@ func (b *Bot) onMemberRemove(s *discordgo.Session, e *discordgo.GuildMemberRemov
 
 func (b *Bot) tick(ctx context.Context) {
 	b.leaveRemoved(ctx)
+	b.notifyVacations(ctx)
 	guilds, err := b.api.ActiveGuilds(ctx)
 	if err != nil {
 		b.log.Error("list guilds", "err", err)

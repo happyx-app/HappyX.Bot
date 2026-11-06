@@ -239,5 +239,17 @@
   "intro.named": "**👁 Amb nom.** {admin} veu qui ha respost què.",
   "intro.game": "🎲 Cada setmana, a més, el joc «Qui és qui?».",
   "intro.pause": "Si no la voleu rebre, feu servir {cmd}.",
-  "test.note": "Prova: no es desa."
+  "test.note": "Prova: no es desa.",
+  "cmd.vacation.name": "vacances",
+  "cmd.vacation.description": "Sense enquesta ni joc durant uns dies",
+  "opt.from.name": "des-de",
+  "opt.from.description": "Primer dia de vacances, el dia primer: 20/12 o 20/12/2026",
+  "opt.to.name": "fins-a",
+  "opt.to.description": "Últim dia de vacances, el dia primer: 6/1 o 6/1/2027",
+  "vacation.done": "🌴 Vacances del {from} al {to}: aquests dies no t'arribarà l'enquesta ni el joc a cap servidor. Per tornar abans, {resume_cmd}.",
+  "vacation.bad_date": "No entenc «{date}». Posa primer el dia, com 20/12 o 20/12/2026.",
+  "vacation.invalid": "Revisa les dates: l'últim dia no pot ser abans del primer ni d'avui, i són {max} dies com a màxim.",
+  "vacation.notice": "🌴 {admin} t'ha posat vacances a **{server}** del {from} al {to}: aquests dies no t'arribarà l'enquesta ni el joc d'aquest servidor. Si no és així, treu-les a {link}.",
+  "status.vacation": "**Vacances:** del {from} al {to}",
+  "status.on_vacation": "de vacances"
 }

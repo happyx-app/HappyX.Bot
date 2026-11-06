@@ -242,5 +242,18 @@
   "intro.named": "**👁 Con nombre.** {admin} ve quién ha respondido qué.",
   "intro.game": "🎲 Cada semana, además, el juego «¿Quién es quién?».",
   "intro.pause": "Si no queréis recibirla, usad {cmd}.",
-  "test.note": "Prueba: no se guarda."
+  "test.note": "Prueba: no se guarda.",
+  "cmd.vacation.name": "vacaciones",
+  "cmd.vacation.description": "Sin encuesta ni juego durante unos días",
+  "opt.from.name": "desde",
+  "opt.from.description": "Primer día de vacaciones (día/mes): 20/12 o 20/12/2026",
+  "opt.to.name": "hasta",
+  "opt.to.description": "Último día de vacaciones (día/mes): 6/1 o 6/1/2027",
+  "vacation.done": "🌴 Vacaciones del {from} al {to}: esos días no te llegará la encuesta ni el juego en ningún servidor. Usa {resume_cmd} para volver antes.",
+  "vacation.bad_date": "No entiendo «{date}». Pon primero el día, como 20/12 o 20/12/2026.",
+  "vacation.invalid": "Revisa las fechas: el último día no puede ser anterior al primero ni a hoy, las vacaciones duran {max} días como mucho y empiezan, como mucho, dentro de un año.",
+  "vacation.notice": "🌴 {admin} te ha puesto vacaciones del {from} al {to}: esos días no te llegará la encuesta ni el juego de **{server}**. Si es un error, quítalas en {link}.",
+  "status.vacation": "**Vacaciones:** del {from} al {to}",
+  "status.on_vacation": "de vacaciones",
+  "vacation.notice_cmd": "🌴 {admin} te ha puesto vacaciones del {from} al {to}: esos días no te llegará la encuesta ni el juego de **{server}**. Si es un error, usa {resume_cmd} en ese servidor."
 }

@@ -17,13 +17,14 @@ import (
 // Command and option names are the English ones; Discord shows the localized names from the
 // catalogs but always sends these back.
 const (
-	cmdStatus = "status"
-	cmdPause  = "pause"
-	cmdResume = "resume"
-	cmdReport = "report"
-	cmdConfig = "config"
-	cmdKudos  = "kudos"
-	cmdSetup  = "setup"
+	cmdStatus   = "status"
+	cmdPause    = "pause"
+	cmdResume   = "resume"
+	cmdReport   = "report"
+	cmdConfig   = "config"
+	cmdKudos    = "kudos"
+	cmdSetup    = "setup"
+	cmdVacation = "vacation"
 
 	// menuKudos is the right-click "Give kudos" on a user or a message; en.json's menu.kudos.
 	menuKudos = "Give kudos"
@@ -41,6 +42,8 @@ const (
 	optGames     = "games"
 	optWorkDays  = "working_days"
 	optSurvey    = "survey"
+	optFrom      = "from"
+	optTo        = "to"
 
 	periodLast    = "last"
 	periodCurrent = "current"
@@ -98,6 +101,9 @@ func commands() []*discordgo.ApplicationCommand {
 			Name: en.T("days." + p.key), NameLocalizations: *localized("days." + p.key), Value: p.key,
 		})
 	}
+	vacationFrom := opt(discordgo.ApplicationCommandOptionString, optFrom)
+	vacationTo := opt(discordgo.ApplicationCommandOptionString, optTo)
+	vacationFrom.Required, vacationTo.Required = true, true
 	language := opt(discordgo.ApplicationCommandOptionString, optLanguage)
 	for _, code := range i18n.Codes() {
 		language.Choices = append(language.Choices, &discordgo.ApplicationCommandOptionChoice{
@@ -118,6 +124,7 @@ func commands() []*discordgo.ApplicationCommand {
 			sub(cmdStatus),
 			sub(cmdPause),
 			sub(cmdResume),
+			sub(cmdVacation, vacationFrom, vacationTo),
 			sub(cmdReport, period),
 			sub(cmdKudos, kudosUser, kudosMessage),
 			sub(cmdSetup),
@@ -325,7 +332,14 @@ func (b *Bot) handleCommand(ctx context.Context, i *discordgo.InteractionCreate)
 			b.replyError(i, l, err)
 			return
 		}
+		// Coming back also ends a vacation. An API from before vacations answers 404.
+		if err := b.api.EndVacations(ctx, i.GuildID, user.ID); err != nil && !errors.Is(err, api.ErrNotFound) {
+			b.replyError(i, l, err)
+			return
+		}
 		b.ephemeral(i, l.T("resume.done"))
+	case cmdVacation:
+		b.cmdVacation(ctx, i, l, user, sub.Options)
 	case cmdConfig:
 		b.cmdConfig(ctx, i, l, user, sub.Options)
 	case cmdReport:
@@ -353,10 +367,19 @@ func (b *Bot) cmdStatus(ctx context.Context, i *discordgo.InteractionCreate, l *
 		b.replyError(i, l, err)
 		return
 	}
+	vacations, err := b.api.Vacations(ctx, i.GuildID, user.ID)
+	if err != nil && !errors.Is(err, api.ErrNotFound) {
+		b.replyError(i, l, err)
+		return
+	}
+	vacationLines, away := vacationStatus(l, vacations, guildToday(g, b.now()))
 	you := l.T("status.paused")
 	for _, m := range members {
 		if m.DiscordID == user.ID {
 			you = l.T("status.not_your_role") // opted in, but the survey roles leave them out
+			if away {
+				you = l.T("status.on_vacation") // the survey list leaves them out today
+			}
 		}
 	}
 	for _, m := range recipients {
@@ -369,7 +392,7 @@ func (b *Bot) cmdStatus(ctx context.Context, i *discordgo.InteractionCreate, l *
 		"frequency", l.T("freq."+g.ReportFrequency), "admin", "<@"+g.AdminDiscordID+">",
 		"anonymous", yesNo(l, g.Anonymous), "language", i18n.Get(g.Language).Name,
 		"participants", len(recipients), "you", you)
-	b.ephemeral(i, afterFirstLine(text, b.surveyOffLine(l, g))+reportDMLine(l, g)+"\n"+kudosChannelLine(l, g)+"\n"+gameLine(l, g))
+	b.ephemeral(i, afterFirstLine(text, b.surveyOffLine(l, g))+vacationLines+reportDMLine(l, g)+"\n"+kudosChannelLine(l, g)+"\n"+gameLine(l, g))
 }
 
 func (b *Bot) cmdConfig(ctx context.Context, i *discordgo.InteractionCreate, l *i18n.Locale, user *discordgo.User, opts []*discordgo.ApplicationCommandInteractionDataOption) {

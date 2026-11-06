@@ -239,5 +239,18 @@
   "intro.named": "**👁 Amb nom.** {admin} veu qui ha respost què.",
   "intro.game": "🎲 Cada setmana, a més, el joc «Qui és qui?».",
   "intro.pause": "Si no la voleu rebre, feu servir {cmd}.",
-  "test.note": "Prova: no es desa."
+  "test.note": "Prova: no es desa.",
+  "cmd.vacation.name": "vacances",
+  "cmd.vacation.description": "Sense enquesta ni joc durant uns dies",
+  "opt.from.name": "des-de",
+  "opt.from.description": "Primer dia de vacances (dia/mes): 20/12 o 20/12/2026",
+  "opt.to.name": "fins-a",
+  "opt.to.description": "Últim dia de vacances (dia/mes): 6/1 o 6/1/2027",
+  "vacation.done": "🌴 Vacances del {from} al {to}: aquests dies no t'arribarà l'enquesta ni el joc a cap servidor. Fes servir {resume_cmd} per tornar abans.",
+  "vacation.bad_date": "No entenc «{date}». Posa primer el dia, com 20/12 o 20/12/2026.",
+  "vacation.invalid": "Revisa les dates: l'últim dia no pot ser anterior al primer ni a avui, les vacances duren {max} dies com a màxim i comencen, com a màxim, d'aquí a un any.",
+  "vacation.notice": "🌴 {admin} t'ha posat vacances del {from} al {to}: aquests dies no t'arribarà l'enquesta ni el joc de **{server}**. Si és un error, treu-les a {link}.",
+  "status.vacation": "**Vacances:** del {from} al {to}",
+  "status.on_vacation": "de vacances",
+  "vacation.notice_cmd": "🌴 {admin} t'ha posat vacances del {from} al {to}: aquests dies no t'arribarà l'enquesta ni el joc de **{server}**. Si és un error, fes servir {resume_cmd} en aquell servidor."
 }

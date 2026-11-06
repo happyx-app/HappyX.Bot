@@ -245,13 +245,14 @@
   "cmd.vacation.name": "férias",
   "cmd.vacation.description": "Sem pesquisa nem jogo por alguns dias",
   "opt.from.name": "de",
-  "opt.from.description": "Primeiro dia de férias, o dia primeiro: 20/12 ou 20/12/2026",
+  "opt.from.description": "Primeiro dia de férias (dia/mês): 20/12 ou 20/12/2026",
   "opt.to.name": "até",
-  "opt.to.description": "Último dia de férias, o dia primeiro: 6/1 ou 6/1/2027",
-  "vacation.done": "🌴 Férias de {from} a {to}: nesses dias você não vai receber a pesquisa nem o jogo em nenhum servidor. Para voltar antes, {resume_cmd}.",
+  "opt.to.description": "Último dia de férias (dia/mês): 6/1 ou 6/1/2027",
+  "vacation.done": "🌴 Férias de {from} a {to}: nesses dias você não vai receber a pesquisa nem o jogo em nenhum servidor. Use {resume_cmd} para voltar antes.",
   "vacation.bad_date": "Não entendi «{date}». Escreva primeiro o dia, como 20/12 ou 20/12/2026.",
-  "vacation.invalid": "Confira as datas: o último dia não pode ser antes do primeiro nem antes de hoje, e são no máximo {max} dias.",
-  "vacation.notice": "🌴 {admin} colocou férias para você em **{server}** de {from} a {to}: nesses dias você não vai receber a pesquisa nem o jogo desse servidor. Se não for o caso, tire em {link}.",
+  "vacation.invalid": "Confira as datas: o último dia não pode ser antes do primeiro nem antes de hoje, as férias duram no máximo {max} dias e começam em até um ano.",
+  "vacation.notice": "🌴 {admin} marcou férias para você de {from} a {to}: nesses dias você não vai receber a pesquisa nem o jogo de **{server}**. Se for um erro, remova em {link}.",
   "status.vacation": "**Férias:** de {from} a {to}",
-  "status.on_vacation": "de férias"
+  "status.on_vacation": "de férias",
+  "vacation.notice_cmd": "🌴 {admin} marcou férias para você de {from} a {to}: nesses dias você não vai receber a pesquisa nem o jogo de **{server}**. Se for um erro, use {resume_cmd} nesse servidor."
 }

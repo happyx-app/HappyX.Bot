@@ -246,13 +246,14 @@
   "cmd.vacation.name": "vacation",
   "cmd.vacation.description": "No survey or game for some days",
   "opt.from.name": "from",
-  "opt.from.description": "First day off, day first: 20/12 or 20/12/2026",
+  "opt.from.description": "First day off (day/month): 20/12 or 20/12/2026",
   "opt.to.name": "to",
-  "opt.to.description": "Last day off, day first: 6/1 or 6/1/2027",
-  "vacation.done": "🌴 Vacation from {from} to {to}: no survey or game those days, in any server. To come back sooner, {resume_cmd}.",
+  "opt.to.description": "Last day off (day/month): 6/1 or 6/1/2027",
+  "vacation.done": "🌴 Vacation from {from} to {to}: no survey or game those days, in any server. Use {resume_cmd} to come back sooner.",
   "vacation.bad_date": "I can't read «{date}». Write the day first, like 20/12 or 20/12/2026.",
-  "vacation.invalid": "Check the dates: the last day can't be before the first one or before today, and it's {max} days at most.",
-  "vacation.notice": "🌴 {admin} set a vacation for you in **{server}** from {from} to {to}: no survey or game from that server those days. If that's wrong, remove it at {link}.",
+  "vacation.invalid": "Check the dates: the last day can't be before the first one or before today, a vacation is {max} days at most, and it starts within a year.",
+  "vacation.notice": "🌴 {admin} set a vacation for you from {from} to {to}: no survey or game from **{server}** those days. If that's wrong, remove it at {link}.",
   "status.vacation": "**Vacation:** {from} to {to}",
-  "status.on_vacation": "on vacation"
+  "status.on_vacation": "on vacation",
+  "vacation.notice_cmd": "🌴 {admin} set a vacation for you from {from} to {to}: no survey or game from **{server}** those days. If that's wrong, use {resume_cmd} in that server."
 }

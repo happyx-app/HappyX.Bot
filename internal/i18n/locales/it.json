@@ -245,13 +245,14 @@
   "cmd.vacation.name": "ferie",
   "cmd.vacation.description": "Niente sondaggio né gioco per qualche giorno",
   "opt.from.name": "dal",
-  "opt.from.description": "Primo giorno di ferie, prima il giorno: 20/12 o 20/12/2026",
+  "opt.from.description": "Primo giorno di ferie (giorno/mese): 20/12 o 20/12/2026",
   "opt.to.name": "al",
-  "opt.to.description": "Ultimo giorno di ferie, prima il giorno: 6/1 o 6/1/2027",
-  "vacation.done": "🌴 Ferie dal {from} al {to}: in quei giorni non riceverai né il sondaggio né il gioco, in nessun server. Per tornare prima, {resume_cmd}.",
+  "opt.to.description": "Ultimo giorno di ferie (giorno/mese): 6/1 o 6/1/2027",
+  "vacation.done": "🌴 Ferie dal {from} al {to}: in quei giorni non riceverai né il sondaggio né il gioco, in nessun server. Usa {resume_cmd} per tornare prima.",
   "vacation.bad_date": "Non capisco «{date}». Scrivi prima il giorno, come 20/12 o 20/12/2026.",
-  "vacation.invalid": "Controlla le date: l'ultimo giorno non può essere prima del primo né prima di oggi, e sono al massimo {max} giorni.",
-  "vacation.notice": "🌴 {admin} ti ha messo in ferie su **{server}** dal {from} al {to}: in quei giorni non riceverai né il sondaggio né il gioco di quel server. Se non è così, toglile su {link}.",
+  "vacation.invalid": "Controlla le date: l'ultimo giorno non può essere prima del primo né prima di oggi, le ferie durano al massimo {max} giorni e iniziano entro un anno.",
+  "vacation.notice": "🌴 {admin} ti ha messo in ferie dal {from} al {to}: in quei giorni non riceverai né il sondaggio né il gioco di **{server}**. Se è un errore, toglile su {link}.",
   "status.vacation": "**Ferie:** dal {from} al {to}",
-  "status.on_vacation": "in ferie"
+  "status.on_vacation": "in ferie",
+  "vacation.notice_cmd": "🌴 {admin} ti ha messo in ferie dal {from} al {to}: in quei giorni non riceverai né il sondaggio né il gioco di **{server}**. Se è un errore, usa {resume_cmd} in quel server."
 }

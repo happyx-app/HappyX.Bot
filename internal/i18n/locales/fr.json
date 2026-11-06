@@ -245,13 +245,14 @@
   "cmd.vacation.name": "vacances",
   "cmd.vacation.description": "Pas de sondage ni de jeu pendant quelques jours",
   "opt.from.name": "du",
-  "opt.from.description": "Premier jour de vacances, le jour d'abord : 20/12 ou 20/12/2026",
+  "opt.from.description": "Premier jour de vacances (jour/mois) : 20/12 ou 20/12/2026",
   "opt.to.name": "au",
-  "opt.to.description": "Dernier jour de vacances, le jour d'abord : 6/1 ou 6/1/2027",
-  "vacation.done": "🌴 Vacances du {from} au {to} : ces jours-là, tu ne recevras ni le sondage ni le jeu, sur aucun serveur. Pour revenir plus tôt, {resume_cmd}.",
+  "opt.to.description": "Dernier jour de vacances (jour/mois) : 6/1 ou 6/1/2027",
+  "vacation.done": "🌴 Vacances du {from} au {to} : ces jours-là, tu ne recevras ni le sondage ni le jeu, sur aucun serveur. Utilise {resume_cmd} pour revenir plus tôt.",
   "vacation.bad_date": "Je ne comprends pas « {date} ». Écris d'abord le jour, comme 20/12 ou 20/12/2026.",
-  "vacation.invalid": "Vérifie les dates : le dernier jour ne peut pas être avant le premier ni avant aujourd'hui, et c'est {max} jours au maximum.",
-  "vacation.notice": "🌴 {admin} t'a mis en vacances sur **{server}** du {from} au {to} : ces jours-là, tu ne recevras ni le sondage ni le jeu de ce serveur. Si ce n'est pas le cas, retire-les sur {link}.",
+  "vacation.invalid": "Vérifie les dates : le dernier jour ne peut pas être avant le premier ni avant aujourd'hui, les vacances durent {max} jours au maximum et commencent dans un an au plus tard.",
+  "vacation.notice": "🌴 {admin} t'a mis en vacances du {from} au {to} : ces jours-là, tu ne recevras ni le sondage ni le jeu de **{server}**. Si c'est une erreur, retire-les sur {link}.",
   "status.vacation": "**Vacances :** du {from} au {to}",
-  "status.on_vacation": "en vacances"
+  "status.on_vacation": "en vacances",
+  "vacation.notice_cmd": "🌴 {admin} t'a mis en vacances du {from} au {to} : ces jours-là, tu ne recevras ni le sondage ni le jeu de **{server}**. Si c'est une erreur, utilise {resume_cmd} sur ce serveur."
 }

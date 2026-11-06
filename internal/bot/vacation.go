@@ -21,6 +21,9 @@ const isoDate = "2006-01-02"
 // member's language.
 const maxVacationDays = 90
 
+// maxVacationLead is how many days ahead a vacation may start, as in the API.
+const maxVacationLead = 365
+
 var (
 	isoDateRe = regexp.MustCompile(`^(\d{4})-(\d{1,2})-(\d{1,2})$`)
 	// Day first, as written in every language HappyX speaks but American English: 20/12,
@@ -113,7 +116,7 @@ func (b *Bot) cmdVacation(ctx context.Context, i *discordgo.InteractionCreate, l
 		b.ephemeral(i, l.T("vacation.bad_date", "date", toText))
 		return
 	}
-	if to.Before(from) || to.Before(today) || to.Sub(from) >= maxVacationDays*24*time.Hour {
+	if to.Before(from) || to.Before(today) || to.Sub(from) >= maxVacationDays*24*time.Hour || from.After(today.AddDate(0, 0, maxVacationLead)) {
 		b.ephemeral(i, l.T("vacation.invalid", "max", maxVacationDays))
 		return
 	}
@@ -155,15 +158,14 @@ func (b *Bot) notifyVacations(ctx context.Context) {
 			continue
 		}
 		l := i18n.Get(g.Language)
-		link := "<" + b.webURL + "/#/me>"
-		if b.webURL == "" {
-			link = b.resumeMention()
+		// Without the web's address, /happyx resume in that server also removes it.
+		content := l.T("vacation.notice_cmd", "admin", "<@"+n.SetByID+">", "server", g.Name,
+			"from", discordDate(n.From), "to", discordDate(n.To), "resume_cmd", b.resumeMention())
+		if b.webURL != "" {
+			content = l.T("vacation.notice", "admin", "<@"+n.SetByID+">", "server", g.Name,
+				"from", discordDate(n.From), "to", discordDate(n.To), "link", "<"+b.webURL+"/#/me>")
 		}
-		msg := &discordgo.MessageSend{
-			Content: l.T("vacation.notice", "admin", "<@"+n.SetByID+">", "server", g.Name,
-				"from", discordDate(n.From), "to", discordDate(n.To), "link", link),
-			AllowedMentions: &discordgo.MessageAllowedMentions{},
-		}
+		msg := &discordgo.MessageSend{Content: content, AllowedMentions: &discordgo.MessageAllowedMentions{}}
 		if err := b.dm(n.UserID, msg); err != nil {
 			b.log.Warn("vacation notice DM", "guild", n.GuildID, "user", n.UserID, "err", err)
 		}

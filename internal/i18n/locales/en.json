@@ -213,7 +213,7 @@
   "setup.dm_off": "Only on the web",
   "setup.kudos": "Kudos channel",
   "setup.kudos_here": "Where the kudos are given",
-  "setup.kudos_cant": "⚠️ HappyX can't post in #{channel}: give it «Send Messages» and «Embed Links» in that channel.",
+  "setup.kudos_cant": "⚠️ HappyX can't post in #{channel}: give it «View Channel», «Send Messages» and «Embed Links» there.",
   "setup.game": "«Who's who?» game",
   "setup.game_off": "Off",
   "setup.game_on": "On",

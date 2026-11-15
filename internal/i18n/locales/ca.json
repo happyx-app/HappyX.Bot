@@ -210,7 +210,7 @@
   "setup.dm_off": "Només al web",
   "setup.kudos": "Canal de kudos",
   "setup.kudos_here": "On es donin els kudos",
-  "setup.kudos_cant": "⚠️ HappyX no pot publicar a #{channel}: dona-li els permisos «Enviar missatges» i «Inserir enllaços» en aquest canal.",
+  "setup.kudos_cant": "⚠️ HappyX no pot publicar a #{channel}: dona-li «Veure el canal», «Enviar missatges» i «Inserir enllaços» en aquest canal.",
   "setup.game": "Joc «Qui és qui?»",
   "setup.game_off": "Desactivat",
   "setup.game_on": "Activat",

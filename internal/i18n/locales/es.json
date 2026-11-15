@@ -213,7 +213,7 @@
   "setup.dm_off": "Solo en la web",
   "setup.kudos": "Canal de kudos",
   "setup.kudos_here": "Donde se den los kudos",
-  "setup.kudos_cant": "⚠️ HappyX no puede publicar en #{channel}: dale los permisos «Enviar mensajes» e «Insertar enlaces» en ese canal.",
+  "setup.kudos_cant": "⚠️ HappyX no puede publicar en #{channel}: dale «Ver canal», «Enviar mensajes» e «Insertar enlaces» en ese canal.",
   "setup.game": "Juego «¿Quién es quién?»",
   "setup.game_off": "Desactivado",
   "setup.game_on": "Activado",

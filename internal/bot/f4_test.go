@@ -128,28 +128,32 @@ func TestYesterdayQuestion(t *testing.T) {
 
 // Resuming ends a vacation going on today, and says so; one planned for later stays.
 func TestResumeVacation(t *testing.T) {
-	vacations := `[{"from":"2026-10-20","to":"2026-10-30"}]`
+	// The API ends the vacations that cover today and returns them; one planned for later stays.
+	ended := `[{"from":"2026-10-20","to":"2026-10-30","set_by_admin":false},{"from":"2026-10-22","to":"2026-10-24","discord_guild_id":"` + fGuild + `","set_by_admin":true}]`
 	f := &fake{h: map[string]func(http.ResponseWriter, *http.Request){
-		"PUT /v1/guilds/" + fGuild + "/members/" + fUser:                reply(`{}`),
-		"GET /v1/guilds/" + fGuild + "/members/" + fUser + "/vacations": func(w http.ResponseWriter, _ *http.Request) { io.WriteString(w, vacations) },
+		"PUT /v1/guilds/" + fGuild + "/members/" + fUser: reply(`{}`),
 		"DELETE /v1/guilds/" + fGuild + "/members/" + fUser + "/vacations": func(w http.ResponseWriter, _ *http.Request) {
-			w.WriteHeader(http.StatusNoContent)
+			io.WriteString(w, ended)
 		},
 	}}
 	b := fakeBot(t, f, time.Date(2026, 10, 23, 12, 0, 0, 0, time.UTC))
 	g := api.Guild{DiscordID: fGuild, Name: "Equipo", Timezone: "Europe/Madrid"}
 	user := &discordgo.User{ID: fUser, Username: "ana"}
-	ended, err := b.resume(context.Background(), g, user)
-	if err != nil || ended == nil || !f.called("DELETE /v1/guilds/"+fGuild+"/members/"+fUser+"/vacations") {
-		t.Fatalf("a vacation on today ends: %v %v", ended, err)
+	vs, err := b.resume(context.Background(), g, user)
+	if err != nil || len(vs) != 2 {
+		t.Fatalf("the vacations on today end: %v %v", vs, err)
 	}
-	if text := resumedText(i18n.Get("es"), g.Name, ended); !strings.Contains(text, "terminan hoy, en todos tus servidores") {
-		t.Errorf("says so: %q", text)
+	text := resumedText(i18n.Get("es"), g.Name, vs)
+	if !strings.Contains(text, "terminan hoy, en todos tus servidores") || !strings.Contains(text, "que te pusieron en **Equipo** terminan hoy") {
+		t.Errorf("says so, for each: %q", text)
 	}
 
-	f.calls, vacations = nil, `[{"from":"2026-12-20","to":"2027-01-06"}]`
-	if ended, err := b.resume(context.Background(), g, user); err != nil || ended != nil || f.called("DELETE /v1/guilds/"+fGuild+"/members/"+fUser+"/vacations") {
-		t.Fatalf("a vacation planned for later stays: %v %v", ended, err)
+	ended = `[]`
+	if vs, err := b.resume(context.Background(), g, user); err != nil || len(vs) != 0 {
+		t.Fatalf("none on today: %v %v", vs, err)
+	}
+	if text := resumedText(i18n.Get("es"), g.Name, nil); strings.Contains(text, "🌴") {
+		t.Errorf("no vacation line without vacations: %q", text)
 	}
 }
 
@@ -228,7 +232,7 @@ func TestGameInSurvey(t *testing.T) {
 
 	q.link = ""
 	propose := withGame(es, g, surveyMessage(es, g, "2026-10-22", surveyRecipient{Name: "Ana"}, ""), q)
-	btn := propose.Components[2].(discordgo.ActionsRow).Components[0].(discordgo.Button)
+	btn := propose.Components[1].(discordgo.ActionsRow).Components[0].(discordgo.Button)
 	if id, ok := parseGameID(btn.CustomID); !ok || id.Action != gamePropose || !strings.Contains(propose.Embeds[1].Description, "Propón") {
 		t.Errorf("too few answers: propose instead: %+v", propose.Embeds[1])
 	}
@@ -314,10 +318,13 @@ func TestOpenSurveyDay(t *testing.T) {
 // /happyx in a DM asks which server when there are several.
 func TestServerPicker(t *testing.T) {
 	es := i18n.Get("es")
-	p := serverPicker(es, cmdPause, []api.Guild{{DiscordID: "1", Name: "A"}, {DiscordID: "2", Name: "B"}})
+	p := serverPicker(es, cmdResume, []api.UserGuild{{Guild: api.Guild{DiscordID: "1", Name: "A"}}, {Guild: api.Guild{DiscordID: "2", Name: "B"}, Paused: true}})
 	menu := p.Components[0].(discordgo.ActionsRow).Components[0].(discordgo.SelectMenu)
-	if id, ok := parseDMID(menu.CustomID); !ok || id.Command != cmdPause || len(menu.Options) != 2 || p.Content != "¿Qué encuesta quieres pausar?" {
+	if id, ok := parseDMID(menu.CustomID); !ok || id.Command != cmdResume || len(menu.Options) != 2 || p.Content != "¿Qué encuesta quieres volver a recibir?" {
 		t.Fatalf("picker: %+v", p)
+	}
+	if menu.Options[0].Description != "" || menu.Options[1].Description != "Pausada" {
+		t.Errorf("the paused one says so: %+v", menu.Options)
 	}
 	if _, ok := parseDMID("hxd:config"); ok {
 		t.Error("only status, pause and resume pick a server")

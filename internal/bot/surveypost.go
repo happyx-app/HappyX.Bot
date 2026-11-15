@@ -132,7 +132,9 @@ func (b *Bot) answerFromChannel(ctx context.Context, i *discordgo.InteractionCre
 			b.log.Error("interaction edit", "err", err)
 		}
 	}
-	recipients, err := b.api.SurveyRecipients(ctx, g.DiscordID, false)
+	// Who got that day's survey: before today's goes out, the open one is yesterday's, and a
+	// vacation that started or ended today doesn't change who could answer it.
+	recipients, err := b.api.SurveyRecipientsOn(ctx, g.DiscordID, day, false)
 	if err != nil {
 		edit(&discordgo.InteractionResponseData{Content: l.T("error.generic")})
 		return
@@ -147,9 +149,19 @@ func (b *Bot) answerFromChannel(ctx context.Context, i *discordgo.InteractionCre
 		edit(&discordgo.InteractionResponseData{Content: l.T("error.generic")})
 		return
 	}
+	// While guessing is open, the card carries the game as the DM's survey does: whoever answers
+	// here gets no game DM either.
+	var guess *guessInSurvey
+	if q := b.openGuess(ctx, g); q != nil && q.plays(user.ID) {
+		guess = q
+	}
 	if len(moods) > 0 {
 		answered := surveyID{Action: actionMood, GuildID: g.DiscordID, Day: day, Mood: moods[0].Mood}
-		edit(b.thanks(ctx, l, g, answered, user, moods[0].Message))
+		data := b.thanks(ctx, l, g, answered, user, moods[0].Message)
+		if guess != nil {
+			data = guess.carried(l, g).onto(data)
+		}
+		edit(data)
 		return
 	}
 	to := surveyRecipient{ID: user.ID, Name: b.userName(g.DiscordID, user), Yesterday: b.yesterday(g, day)}
@@ -157,6 +169,9 @@ func (b *Bot) answerFromChannel(ctx context.Context, i *discordgo.InteractionCre
 		to.PolicyURL = b.policyURL()
 	}
 	msg := surveyMessage(l, g, day, to, b.guildIcon(g.DiscordID))
+	if guess != nil {
+		msg = withGame(l, g, msg, guess)
+	}
 	edit(&discordgo.InteractionResponseData{Embeds: msg.Embeds, Components: msg.Components, AllowedMentions: msg.AllowedMentions})
 }
 

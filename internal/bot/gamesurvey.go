@@ -31,6 +31,20 @@ type guessInSurvey struct {
 // returns nil when the game isn't on, isn't due, was sent already, or can't be read; the game's
 // own dispatch then sends it as before.
 func (b *Bot) claimGuess(ctx context.Context, g api.Guild) *guessInSurvey {
+	q := b.openGuess(ctx, g)
+	if q == nil {
+		return nil
+	}
+	claimed, err := b.api.ClaimDispatch(ctx, g.DiscordID, "game_guess", q.week)
+	if err != nil || !claimed {
+		return nil
+	}
+	return q
+}
+
+// openGuess is the game's line for a survey while guessing is open, Thursday to Sunday, or nil
+// when the game isn't on, isn't open or can't be read.
+func (b *Bot) openGuess(ctx context.Context, g api.Guild) *guessInSurvey {
 	if !g.GamesEnabled {
 		return nil
 	}
@@ -53,10 +67,6 @@ func (b *Bot) claimGuess(ctx context.Context, g api.Guild) *guessInSurvey {
 	players, err := b.api.GamePlayers(ctx, g.DiscordID)
 	if err != nil {
 		b.log.Warn("game players for the survey", "guild", g.DiscordID, "err", err)
-		return nil
-	}
-	claimed, err := b.api.ClaimDispatch(ctx, g.DiscordID, "game_guess", week)
-	if err != nil || !claimed {
 		return nil
 	}
 	if r.Answers < r.MinAnswers {
@@ -96,10 +106,12 @@ func gameRow(l *i18n.Locale, g api.Guild, q *guessInSurvey) discordgo.ActionsRow
 	return discordgo.ActionsRow{Components: []discordgo.MessageComponent{btn}}
 }
 
-// withGame adds the game's line and button to a survey.
+// withGame adds the game's line and button to a survey, the button right under the faces, next to
+// its line, before the options.
 func withGame(l *i18n.Locale, g api.Guild, msg *discordgo.MessageSend, q *guessInSurvey) *discordgo.MessageSend {
 	msg.Embeds = append(msg.Embeds, gameEmbed(l, q))
-	msg.Components = append(msg.Components, gameRow(l, g, q))
+	at := min(1, len(msg.Components))
+	msg.Components = append(msg.Components[:at], append([]discordgo.MessageComponent{gameRow(l, g, q)}, msg.Components[at:]...)...)
 	return msg
 }
 
@@ -141,6 +153,12 @@ func isGameButton(btn *discordgo.Button) bool {
 	return ok
 }
 
+// carried is the game's line and button, to put on a card with onto.
+func (q *guessInSurvey) carried(l *i18n.Locale, g api.Guild) gameCarried {
+	row := gameRow(l, g, q)
+	return gameCarried{embeds: []*discordgo.MessageEmbed{gameEmbed(l, q)}, row: row.Components}
+}
+
 func (c gameCarried) empty() bool { return len(c.embeds) == 0 && len(c.row) == 0 }
 
 // onto puts the game's line and button back on a card's new content.
@@ -172,7 +190,7 @@ func (b *Bot) sendGuessDMs(ctx context.Context, g api.Guild, q *guessInSurvey, i
 	if recipients == 0 {
 		return
 	}
-	if err := b.api.FinishDispatch(ctx, g.DiscordID, "game_guess", q.week, recipients, failed); err != nil {
+	if err := b.api.FinishDispatch(ctx, g.DiscordID, "game_guess", q.week, recipients, failed, d.closed); err != nil {
 		b.log.Warn("game guess dispatch counts", "guild", g.DiscordID, "err", err)
 	}
 }

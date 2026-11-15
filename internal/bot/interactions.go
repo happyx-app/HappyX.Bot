@@ -484,12 +484,23 @@ func (b *Bot) status(ctx context.Context, l *i18n.Locale, g api.Guild, user *dis
 	}
 	level, err := b.api.Access(ctx, g.DiscordID, user.ID, discordAdmin)
 	settings := err == nil && accessRank(level) >= accessRank(api.AccessView)
-	return b.statusMessage(l, g, you, b.surveyOffLine(l, g), vacationLines, paused, settings, len(recipients)), nil
+	closed := 0
+	if settings {
+		// Who couldn't get the last survey by DM, for the team channel's warning. Without the
+		// count (an older API) there is just no warning.
+		if h, err := b.api.Health(ctx, g.DiscordID); err == nil && h.LastSurvey != nil {
+			closed = h.LastSurvey.ClosedDMs
+		} else if err != nil {
+			b.log.Warn("server health for status", "guild", g.DiscordID, "err", err)
+		}
+	}
+	return b.statusMessage(l, g, you, b.surveyOffLine(l, g), vacationLines, paused, settings, len(recipients), closed), nil
 }
 
 // statusMessage is /happyx status: where the member stands, what admins see of their answers,
 // their vacations and, for whoever can see the reports, the server's settings.
-func (b *Bot) statusMessage(l *i18n.Locale, g api.Guild, you, offLine, vacationLines string, paused, settings bool, participants int) *discordgo.InteractionResponseData {
+// closedDMs is how many people the last survey couldn't reach because they have DMs closed.
+func (b *Bot) statusMessage(l *i18n.Locale, g api.Guild, you, offLine, vacationLines string, paused, settings bool, participants, closedDMs int) *discordgo.InteractionResponseData {
 	schedule := surveySchedule(l, g)
 	if paused {
 		schedule = "" // it doesn't come on those days now
@@ -504,7 +515,7 @@ func (b *Bot) statusMessage(l *i18n.Locale, g api.Guild, you, offLine, vacationL
 		text += "\n\n" + l.T("status.settings",
 			"frequency", l.T("freq."+g.ReportFrequency), "admin", "<@"+g.AdminDiscordID+">",
 			"language", i18n.Get(g.Language).Name, "participants", participants) +
-			reportDMLine(l, g) + "\n" + kudosChannelLine(l, g) + "\n" + teamChannelLine(l, g) + b.teamChannelWarning(l, g) + "\n" + gameLine(l, g)
+			reportDMLine(l, g) + "\n" + kudosChannelLine(l, g) + "\n" + teamChannelLine(l, g) + b.teamChannelWarning(l, g) + b.closedDMsWarning(l, g, closedDMs) + "\n" + gameLine(l, g)
 	}
 	return &discordgo.InteractionResponseData{
 		Content:         text,

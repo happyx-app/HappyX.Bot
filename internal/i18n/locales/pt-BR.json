@@ -294,7 +294,7 @@
   "survey.resumed": "Reativada. Você vai receber a próxima.",
   "survey.note_too_late": "Esta pesquisa já fechou e o comentário não foi salvo:\n{comment}",
   "opt.team_channel.name": "canal_equipe",
-  "opt.team_channel.description": "Resumo de segunda, o que vocês contarem depois do relatório e a pesquisa sem mensagens diretas",
+  "opt.team_channel.description": "Resumo de segunda, o que vocês contarem depois do relatório e a pesquisa para quem não recebe DMs",
   "opt.team_summary.name": "resumo_segunda",
   "opt.team_summary.description": "Publicar toda segunda no canal da equipe um resumo da semana, sem o humor",
   "report.average_line": "**Humor médio:** {value} / 5 {emoji}",
@@ -360,10 +360,10 @@
   "survey.question_yesterday": "Como você esteve ontem?",
   "resume.vacation_ended": "🌴 Suas férias de {from} a {to} terminam hoje, em todos os seus servidores.",
   "resume.vacation_ended_admin": "🌴 As férias de {from} a {to} que colocaram para você em **{guild}** terminam hoje.",
-  "post.text": "Não recebe as mensagens diretas do HappyX? Responda aqui à pesquisa de cada dia: só você vê o cartão e a sua resposta.\nPara recebê-la por mensagem direta, ative as mensagens diretas nas configurações de privacidade do servidor.",
+  "post.text": "Não recebe as mensagens diretas do HappyX? Responda aqui à pesquisa de cada dia: só você vê o cartão e a sua resposta.\nPara recebê-la por mensagem direta, ative «Mensagens diretas» nas configurações de privacidade do servidor.",
   "post.answer_button": "Responder hoje",
-  "post.off": "A pesquisa de **{guild}** está parada.",
-  "post.none": "Agora não há nenhuma pesquisa aberta. A próxima chega em {when}.",
+  "post.off": "A pesquisa de **{guild}** está desligada.",
+  "post.none": "Agora não há nenhuma pesquisa aberta. A próxima chega {when}.",
   "post.not_yours": "Hoje você não recebe a pesquisa de **{guild}**. Veja por quê com {status_cmd}.",
   "dm.server_only": "Use este comando em um canal do servidor.",
   "dm.no_servers": "Você não está em nenhum servidor com o HappyX.",
@@ -373,5 +373,9 @@
   "dm.pick_placeholder": "Escolha um servidor",
   "dm.not_there": "Você não está mais nesse servidor.",
   "game.in_survey_guess": "🎲 **Quem é quem?** {count} colegas responderam «{question}». Adivinhe quem escreveu cada resposta, até domingo.",
-  "game.in_survey_propose": "🎲 **Quem é quem?** Proponha a pergunta da próxima semana, até domingo."
+  "game.in_survey_propose": "🎲 **Quem é quem?** Pouca gente respondeu esta semana para jogar. Proponha uma pergunta para a próxima semana, até domingo.",
+  "team.closed_dms": "⚠️ {count} pessoas estão com as mensagens diretas fechadas e não receberam a última pesquisa. Escolha um canal da equipe com {config_cmd} para que possam responder lá.",
+  "team.closed_dms_one": "⚠️ 1 pessoa está com as mensagens diretas fechadas e não recebeu a última pesquisa. Escolha um canal da equipe com {config_cmd} para que possa responder lá.",
+  "dm.paused_here": "Pausada",
+  "dm.all_paused": "Você já pausou a pesquisa em todos os seus servidores. Para voltar a receber, use {resume_cmd}."
 }

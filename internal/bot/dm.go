@@ -3,6 +3,7 @@ package bot
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
@@ -59,21 +60,34 @@ func (b *Bot) handleDMCommand(ctx context.Context, i *discordgo.InteractionCreat
 	}
 	if sub.Name == cmdVacation {
 		// A vacation counts in every server: any of them reads the dates in its timezone.
-		b.dmVacation(ctx, i, l, guilds[0], user, sub.Options)
+		b.dmVacation(ctx, i, l, guilds[0].Guild, user, sub.Options)
 		return
 	}
+	if sub.Name == cmdPause {
+		// Only a survey they still get can be paused.
+		guilds = slices.DeleteFunc(guilds, func(g api.UserGuild) bool { return g.Paused })
+		if len(guilds) == 0 {
+			b.ephemeral(i, l.T("dm.all_paused", "resume_cmd", b.resumeMention()))
+			return
+		}
+	}
 	if len(guilds) == 1 {
-		b.respond(i, discordgo.InteractionResponseChannelMessageWithSource, b.dmAct(ctx, l, guilds[0], user, sub.Name))
+		b.respond(i, discordgo.InteractionResponseChannelMessageWithSource, b.dmAct(ctx, l, guilds[0].Guild, user, sub.Name))
 		return
 	}
 	b.respond(i, discordgo.InteractionResponseChannelMessageWithSource, serverPicker(l, sub.Name, guilds))
 }
 
-// serverPicker asks which server /happyx command is about.
-func serverPicker(l *i18n.Locale, command string, guilds []api.Guild) *discordgo.InteractionResponseData {
+// serverPicker asks which server /happyx command is about. The ones whose survey the member
+// paused say so; resuming one they still get ends a vacation going on there.
+func serverPicker(l *i18n.Locale, command string, guilds []api.UserGuild) *discordgo.InteractionResponseData {
 	opts := make([]discordgo.SelectMenuOption, 0, min(len(guilds), maxPickerServers))
 	for _, g := range guilds[:min(len(guilds), maxPickerServers)] {
-		opts = append(opts, discordgo.SelectMenuOption{Label: truncate(g.Name, 100), Value: g.DiscordID})
+		o := discordgo.SelectMenuOption{Label: truncate(g.Name, 100), Value: g.DiscordID}
+		if g.Paused {
+			o.Description = l.T("dm.paused_here")
+		}
+		opts = append(opts, o)
 	}
 	return &discordgo.InteractionResponseData{
 		Content: l.T("dm.pick_" + command),
@@ -100,7 +114,7 @@ func (b *Bot) handleDMPick(ctx context.Context, i *discordgo.InteractionCreate, 
 	}
 	for _, g := range guilds {
 		if g.DiscordID == values[0] {
-			data := b.dmAct(ctx, l, g, user, id.Command)
+			data := b.dmAct(ctx, l, g.Guild, user, id.Command)
 			data.Flags = 0 // updating the ephemeral message keeps it ephemeral
 			b.respond(i, discordgo.InteractionResponseUpdateMessage, data)
 			return

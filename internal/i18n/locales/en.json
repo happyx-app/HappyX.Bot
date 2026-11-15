@@ -295,7 +295,7 @@
   "survey.resumed": "Turned back on. You'll get the next one.",
   "survey.note_too_late": "This survey is closed, so the comment wasn't saved:\n{comment}",
   "opt.team_channel.name": "team_channel",
-  "opt.team_channel.description": "Monday summary, what you tell the team after the report, and the survey without DMs",
+  "opt.team_channel.description": "Monday summary, what you tell the team after the report, and the survey for whoever gets no DMs",
   "opt.team_summary.name": "monday_summary",
   "opt.team_summary.description": "Post a summary of the week in the team channel every Monday, without the mood",
   "report.average_line": "**Average mood:** {value} / 5 {emoji}",
@@ -361,7 +361,7 @@
   "survey.question_yesterday": "How were you feeling yesterday?",
   "resume.vacation_ended": "🌴 Your vacation from {from} to {to} ends today, in every server.",
   "resume.vacation_ended_admin": "🌴 The vacation from {from} to {to} set for you in **{guild}** ends today.",
-  "post.text": "Not getting HappyX's DMs? Answer the daily survey here: only you see the card and your answer.\nTo get it by DM, turn on direct messages in the server's privacy settings.",
+  "post.text": "Not getting HappyX's DMs? Answer the daily survey here: only you see the card and your answer.\nTo get it by DM, turn on «Direct Messages» in the server's Privacy Settings.",
   "post.answer_button": "Answer today",
   "post.off": "The **{guild}** survey is off.",
   "post.none": "There's no survey open right now. The next one arrives {when}.",
@@ -374,5 +374,9 @@
   "dm.pick_placeholder": "Choose a server",
   "dm.not_there": "You're not in that server anymore.",
   "game.in_survey_guess": "🎲 **Who's who?** {count} teammates answered «{question}». Guess who wrote each answer, until Sunday.",
-  "game.in_survey_propose": "🎲 **Who's who?** Propose next week's question, until Sunday."
+  "game.in_survey_propose": "🎲 **Who's who?** Too few people answered this week to play. Propose a question for next week, until Sunday.",
+  "team.closed_dms": "⚠️ {count} people have DMs closed and didn't get the last survey. Choose a team channel with {config_cmd} so they can answer there.",
+  "team.closed_dms_one": "⚠️ 1 person has DMs closed and didn't get the last survey. Choose a team channel with {config_cmd} so they can answer there.",
+  "dm.paused_here": "Paused",
+  "dm.all_paused": "You've already paused the survey in all your servers. To get it again, use {resume_cmd}."
 }

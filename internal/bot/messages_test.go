@@ -556,7 +556,7 @@ func TestPausedStatusLeavesOutTheSchedule(t *testing.T) {
 	es := i18n.Get("es")
 	g := api.Guild{DiscordID: "100000000000000001", Name: "Equipo", Anonymous: true, Timezone: "Europe/Madrid", SurveyHour: 13}
 	b := &Bot{now: func() time.Time { return time.Date(2026, 10, 23, 12, 0, 0, 0, time.UTC) }}
-	got := b.statusMessage(es, g, es.T("status.you_paused"), "", "", true, false, 3).Content
+	got := b.statusMessage(es, g, es.T("status.you_paused"), "", "", true, false, 3, 0).Content
 	if !strings.HasPrefix(got, "**Equipo** · Tienes la encuesta pausada.\n") {
 		t.Fatalf("paused status: %q", got)
 	}

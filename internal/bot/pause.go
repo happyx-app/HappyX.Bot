@@ -13,41 +13,29 @@ import (
 // Pausing and resuming change the survey card in the member's DM wherever they are done from:
 // the card's own options, /happyx status, /happyx pause or resume, in a server or in the DM.
 
-// resume makes the member get the guild's survey again. Being back also ends a vacation going
-// on today, and says so; one planned for later stays. It returns the vacation it ended, if any.
-// An API from before vacations answers 404.
-func (b *Bot) resume(ctx context.Context, g api.Guild, user *discordgo.User) (*api.Vacation, error) {
+// resume makes the member get the guild's survey again. Being back also ends the vacations going
+// on today, and says so; the days already gone stay vacation, and one planned for later stays.
+// It returns the vacations it ended. An API from before vacations answers 404.
+func (b *Bot) resume(ctx context.Context, g api.Guild, user *discordgo.User) ([]api.Vacation, error) {
 	yes := true
 	if err := b.api.UpsertMember(ctx, g.DiscordID, user.ID, user.Username, &yes); err != nil {
 		return nil, err
 	}
-	vs, err := b.api.Vacations(ctx, g.DiscordID, user.ID)
+	ended, err := b.api.EndVacations(ctx, g.DiscordID, user.ID)
 	if errors.Is(err, api.ErrNotFound) {
 		return nil, nil
 	}
-	if err != nil {
-		return nil, err
-	}
-	today := guildToday(g, b.now()).Format(isoDate)
-	for _, v := range vs {
-		if v.From <= today && today <= v.To {
-			if err := b.api.EndVacations(ctx, g.DiscordID, user.ID); err != nil && !errors.Is(err, api.ErrNotFound) {
-				return nil, err
-			}
-			return &v, nil
-		}
-	}
-	return nil, nil
+	return ended, err
 }
 
-// resumedText is the reply to resuming g's survey, with the vacation that ended, if any.
-func resumedText(l *i18n.Locale, guildName string, ended *api.Vacation) string {
+// resumedText is the reply to resuming g's survey, with the vacations that ended, if any.
+func resumedText(l *i18n.Locale, guildName string, ended []api.Vacation) string {
 	text := l.T("resume.done", "guild", guildName)
 	if guildName == "" {
 		text = l.T("resume.done_here")
 	}
-	if ended != nil {
-		text += "\n" + vacationEndedText(l, guildName, *ended)
+	for _, v := range ended {
+		text += "\n" + vacationEndedText(l, guildName, v)
 	}
 	return text
 }

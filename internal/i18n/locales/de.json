@@ -294,7 +294,7 @@
   "survey.resumed": "Wieder aktiv. Du bekommst die nächste.",
   "survey.note_too_late": "Diese Umfrage ist geschlossen, der Kommentar wurde nicht gespeichert:\n{comment}",
   "opt.team_channel.name": "team_kanal",
-  "opt.team_channel.description": "Montagszusammenfassung, eure Nachricht nach dem Report und die Umfrage ohne Direktnachrichten",
+  "opt.team_channel.description": "Montagszusammenfassung, eure Nachricht nach dem Report und die Umfrage für alle ohne DMs",
   "opt.team_summary.name": "montagsuebersicht",
   "opt.team_summary.description": "Jeden Montag eine Übersicht der Woche im Team-Kanal posten, ohne die Stimmung",
   "report.average_line": "**Durchschnittliche Stimmung:** {value} / 5 {emoji}",
@@ -360,7 +360,7 @@
   "survey.question_yesterday": "Wie ging es dir gestern?",
   "resume.vacation_ended": "🌴 Dein Urlaub vom {from} bis {to} endet heute, auf allen deinen Servern.",
   "resume.vacation_ended_admin": "🌴 Der Urlaub vom {from} bis {to}, den man dir in **{guild}** eingetragen hat, endet heute.",
-  "post.text": "Du bekommst keine Direktnachrichten von HappyX? Beantworte die tägliche Umfrage hier: Die Karte und deine Antwort siehst nur du.\nUm sie per Direktnachricht zu bekommen, aktiviere Direktnachrichten in den Privatsphäre-Einstellungen des Servers.",
+  "post.text": "Du bekommst keine Direktnachrichten von HappyX? Beantworte die tägliche Umfrage hier: Die Karte und deine Antwort siehst nur du.\nUm sie per Direktnachricht zu bekommen, aktiviere «Direktnachrichten» in den Privatsphäre-Einstellungen des Servers.",
   "post.answer_button": "Heute antworten",
   "post.off": "Die Umfrage von **{guild}** ist ausgeschaltet.",
   "post.none": "Gerade ist keine Umfrage offen. Die nächste kommt am {when}.",
@@ -373,5 +373,9 @@
   "dm.pick_placeholder": "Wähle einen Server",
   "dm.not_there": "Du bist nicht mehr auf diesem Server.",
   "game.in_survey_guess": "🎲 **Wer ist wer?** {count} Teammitglieder haben «{question}» beantwortet. Rate bis Sonntag, wer was geschrieben hat.",
-  "game.in_survey_propose": "🎲 **Wer ist wer?** Schlag bis Sonntag die Frage für nächste Woche vor."
+  "game.in_survey_propose": "🎲 **Wer ist wer?** Diese Woche haben zu wenige geantwortet, um zu spielen. Schlag bis Sonntag eine Frage für nächste Woche vor.",
+  "team.closed_dms": "⚠️ {count} Personen haben Direktnachrichten geschlossen und die letzte Umfrage nicht bekommen. Wähle mit {config_cmd} einen Team-Kanal, damit sie dort antworten können.",
+  "team.closed_dms_one": "⚠️ 1 Person hat Direktnachrichten geschlossen und die letzte Umfrage nicht bekommen. Wähle mit {config_cmd} einen Team-Kanal, damit sie dort antworten kann.",
+  "dm.paused_here": "Pausiert",
+  "dm.all_paused": "Du hast die Umfrage schon auf allen deinen Servern pausiert. Um sie wieder zu bekommen, nutze {resume_cmd}."
 }

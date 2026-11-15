@@ -396,7 +396,8 @@ const (
 )
 
 // dispatch runs send only if the API confirms nobody sent it yet for this period, then tells
-// the API how many people it went to and how many DMs failed, for the admin dashboard. A send
+// the API how many people it went to, how many DMs failed and how many of those because DMs are
+// closed, for the dashboards and /happyx status. A send
 // that failed before reaching anybody gives its claim back, so it is tried again a few times.
 func (b *Bot) dispatch(ctx context.Context, g api.Guild, kind, period string, send func() (delivery, error)) {
 	key := g.DiscordID + "/" + kind + "/" + period
@@ -415,7 +416,7 @@ func (b *Bot) dispatch(ctx context.Context, g api.Guild, kind, period string, se
 	}
 	d, err := send()
 	if d.recipients > 0 {
-		if err := b.api.FinishDispatch(ctx, g.DiscordID, kind, period, d.recipients, d.failed); err != nil {
+		if err := b.api.FinishDispatch(ctx, g.DiscordID, kind, period, d.recipients, d.failed, d.closed); err != nil {
 			b.log.Warn("report dispatch counts", "guild", g.DiscordID, "kind", kind, "period", period, "err", err)
 		}
 	}

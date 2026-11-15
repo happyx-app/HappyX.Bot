@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 	"unicode"
 	"unicode/utf8"
@@ -119,10 +120,9 @@ func (b *Bot) handleOptions(ctx context.Context, i *discordgo.InteractionCreate,
 			}
 		case id.Msg == "":
 			// From /happyx status or a survey answered in the channel: the open survey in the
-			// DM, if there is one, turns into the paused card all the same.
-			if b.syncSurveyCard(l, g, user, true) {
-				content = l.T("options.paused", "guild", g.Name)
-			}
+			// DM, if there is one, turns into the paused card all the same. The reply still says
+			// how to resume, as that card isn't the one in front of them.
+			b.syncSurveyCard(l, g, user, true)
 		}
 		b.respond(i, discordgo.InteractionResponseUpdateMessage, &discordgo.InteractionResponseData{
 			Content: content, Components: []discordgo.MessageComponent{}, AllowedMentions: &discordgo.MessageAllowedMentions{},
@@ -136,8 +136,12 @@ func (b *Bot) handleOptions(ctx context.Context, i *discordgo.InteractionCreate,
 		if i.Message != nil && i.Message.Flags&discordgo.MessageFlagsEphemeral == 0 {
 			// The paused survey card: today's survey comes back to be answered.
 			b.respond(i, discordgo.InteractionResponseUpdateMessage, b.resumedSurvey(l, g, id.Day, user))
-			if ended != nil {
-				b.followUp(i, vacationEndedText(l, g.Name, *ended))
+			if len(ended) > 0 {
+				lines := make([]string, len(ended))
+				for n, v := range ended {
+					lines[n] = vacationEndedText(l, g.Name, v)
+				}
+				b.followUp(i, strings.Join(lines, "\n"))
 			}
 			return
 		}

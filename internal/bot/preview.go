@@ -46,6 +46,8 @@ func Previews(code string) []Preview {
 	cmdID := "900000000000000001" // as once the commands are registered: mentions are clickable
 	b.commandID.Store(&cmdID)
 	public, no := g, false
+	noTeamChannel := g
+	noTeamChannel.KudosChannelID = ""
 	public.Anonymous, public.NamedSince = false, "2026-10-24" // turned off today: names from tomorrow
 	five, fivePeople := 5, g
 	fivePeople.AnonymityThreshold = 5
@@ -126,22 +128,27 @@ func Previews(code string) []Preview {
 		{Title: "Thursday's survey with «Who's who?» when too few answered", Channel: "DM", Msg: withGame(l, g, surveyMessage(l, games, "2026-10-22", ana, PreviewGuildIcon), fewGuess)},
 		{Title: "After answering Thursday's survey", Channel: "DM", Msg: data(carriedGame(asMessageSend(withGame(l, g, surveyMessage(l, games, "2026-10-22", ana, PreviewGuildIcon), guess))).
 			onto(answeredMessage(l, g, surveyID{Action: actionMood, GuildID: g.DiscordID, Day: "2026-10-22", Mood: 4}, "Ana", "")))},
+		{Title: "Thursday's survey, unanswered, once Friday's arrives (the game stays until Sunday)", Channel: "DM", Msg: closedWithGame(l, g, withGame(l, g, surveyMessage(l, games, "2026-10-22", ana, PreviewGuildIcon), guess))},
 		{Title: "The survey in the team channel, for whoever doesn't get DMs", Channel: "#kudos", Msg: surveyPost(l, g)},
 		{Title: "«Answer today» pressed", Channel: "#kudos", Ephemeral: true, Msg: surveyMessage(l, g, day, ana, PreviewGuildIcon)},
+		{Title: "«Answer today» pressed on Thursday, by someone who plays «Who's who?»", Channel: "#kudos", Ephemeral: true,
+			Msg: withGame(l, g, surveyMessage(l, games, "2026-10-22", ana, PreviewGuildIcon), guess)},
 		{Title: "«Answer today» before that day's survey", Channel: "#kudos", Ephemeral: true,
 			Msg: text(l.T("post.none", "when", fmt.Sprintf("<t:%d:F>", time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC).Unix())))},
 		{Title: "«Answer today» by someone who doesn't get the survey today", Channel: "#kudos", Ephemeral: true,
 			Msg: text(l.T("post.not_yours", "guild", g.Name, "status_cmd", b.mention(cmdStatus)))},
 		{Title: "/happyx pause in a DM, in two servers", Channel: "DM", Command: "/happyx pause", Ephemeral: true,
-			Msg: data(serverPicker(l, cmdPause, []api.Guild{g, {DiscordID: "100000000000000002", Name: "Club de lectura"}}))},
+			Msg: data(serverPicker(l, cmdPause, []api.UserGuild{{Guild: g}, {Guild: api.Guild{DiscordID: "100000000000000002", Name: "Club de lectura"}}}))},
+		{Title: "/happyx resume in a DM, in two servers, one paused", Channel: "DM", Command: "/happyx resume", Ephemeral: true,
+			Msg: data(serverPicker(l, cmdResume, []api.UserGuild{{Guild: g}, {Guild: api.Guild{DiscordID: "100000000000000002", Name: "Club de lectura"}, Paused: true}}))},
 		{Title: "/happyx pause in a DM, once the server is picked", Channel: "DM", Ephemeral: true,
 			Msg: text(l.T("options.paused_cmd", "guild", g.Name, "resume_cmd", b.resumeMention()))},
 		{Title: "/happyx status in a DM", Channel: "DM", Command: "/happyx status", Ephemeral: true,
-			Msg: data(b.statusMessage(l, g, l.T("status.you_receiving"), "", "", false, false, 12))},
+			Msg: data(b.statusMessage(l, g, l.T("status.you_receiving"), "", "", false, false, 12, 0))},
 		{Title: "/happyx config in a DM", Channel: "DM", Command: "/happyx config", Ephemeral: true, Msg: text(l.T("dm.server_only"))},
 		{Title: "Resuming while on vacation", Channel: "#general", Command: "/happyx resume", Ephemeral: true,
-			Msg: text(resumedText(l, g.Name, &api.Vacation{From: "2026-10-20", To: "2026-10-30"}))},
-		{Title: "Pause from /happyx status (the survey card in the DM turns paused too)", Channel: "#general", Ephemeral: true, Msg: text(l.T("options.paused", "guild", g.Name))},
+			Msg: text(resumedText(l, g.Name, []api.Vacation{{From: "2026-10-20", To: "2026-10-30"}}))},
+		{Title: "Pause from /happyx status (the survey card in the DM turns paused too)", Channel: "#general", Ephemeral: true, Msg: text(l.T("options.paused_cmd", "guild", g.Name, "resume_cmd", b.resumeMention()))},
 		{Title: "Kudos card", Channel: "#kudos", Command: "/happyx kudos", Msg: kudosCard(l, anaP, beaP, kudosMsg, nil)},
 		{Title: "Kudos card from a message (right-click › Apps)", Channel: "#kudos", Command: menuKudos,
 			Msg: kudosCard(l, anaP, beaP, kudosMsg, &kudosOrigin{ChannelID: PreviewGeneralID, Link: link})},
@@ -152,11 +159,13 @@ func Previews(code string) []Preview {
 		{Title: "Kudos to a bot", Channel: "#general", Command: "/happyx kudos", Ephemeral: true, Msg: text(l.T("kudos.no_bots"))},
 		{Title: "Kudos daily limit", Channel: "#general", Command: "/happyx kudos", Ephemeral: true, Msg: text(l.T("kudos.too_many"))},
 		{Title: "Status (a member)", Channel: "#general", Command: "/happyx status", Ephemeral: true,
-			Msg: data(b.statusMessage(l, g, l.T("status.you_receiving"), "", "", false, false, 12))},
+			Msg: data(b.statusMessage(l, g, l.T("status.you_receiving"), "", "", false, false, 12, 0))},
 		{Title: "Status (paused)", Channel: "#general", Command: "/happyx status", Ephemeral: true,
-			Msg: data(b.statusMessage(l, g, l.T("status.you_paused"), "", "", true, false, 12))},
+			Msg: data(b.statusMessage(l, g, l.T("status.you_paused"), "", "", true, false, 12, 0))},
 		{Title: "Status (an admin)", Channel: "#general", Command: "/happyx status", Ephemeral: true,
-			Msg: data(b.statusMessage(l, g, l.T("status.you_receiving"), "", "", false, true, 12))},
+			Msg: data(b.statusMessage(l, g, l.T("status.you_receiving"), "", "", false, true, 12, 0))},
+		{Title: "Status (an admin), with people who have DMs closed and no team channel", Channel: "#general", Command: "/happyx status", Ephemeral: true,
+			Msg: data(b.statusMessage(l, noTeamChannel, l.T("status.you_receiving"), "", "", false, true, 12, 2))},
 		{Title: "Changing the working days", Channel: "#general", Command: "/happyx config working_days:" + l.T("days.sun_thu"), Ephemeral: true,
 			Msg: text(configSaved(l, sunToThu, api.GuildPatch{WorkingDays: sunToThu.WorkingDays}, 0))},
 		{Title: "Turning anonymity off", Channel: "#general", Command: "/happyx config anonymous:False", Ephemeral: true,
@@ -314,4 +323,14 @@ func asMessageSend(m *discordgo.MessageSend) *discordgo.Message {
 	raw, _ := json.Marshal(map[string]any{"embeds": m.Embeds, "components": m.Components})
 	_ = json.Unmarshal(raw, &out)
 	return &out
+}
+
+// closedWithGame is a survey closed by the next one, built as closeOldSurveys does from the card
+// Discord sends back.
+func closedWithGame(l *i18n.Locale, g api.Guild, survey *discordgo.MessageSend) *discordgo.MessageSend {
+	game := carriedGame(asMessageSend(survey))
+	return &discordgo.MessageSend{
+		Embeds:     append([]*discordgo.MessageEmbed{closedEmbed(l, g.Name, "2026-10-22")}, game.embeds...),
+		Components: []discordgo.MessageComponent{discordgo.ActionsRow{Components: game.row}},
+	}
 }

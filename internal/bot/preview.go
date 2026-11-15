@@ -40,7 +40,7 @@ func Previews(code string) []Preview {
 	day := "2026-10-23"
 	g := api.Guild{DiscordID: PreviewGuildID, Name: "Equipo Demo", AdminDiscordID: PreviewAdminID, Anonymous: true,
 		Timezone: "Europe/Madrid", SurveyHour: 13, ReportFrequency: "weekly", Language: code, KudosChannelID: PreviewChannelID,
-		WorkingDays: presetDays("mon_fri")}
+		WorkingDays: presetDays("mon_fri"), TeamSummary: true}
 	b := &Bot{webURL: "https://happyx.example.com", now: func() time.Time { return time.Date(2026, 10, 23, 12, 0, 0, 0, time.UTC) }}
 	cmdID := "900000000000000001" // as once the commands are registered: mentions are clickable
 	b.commandID.Store(&cmdID)

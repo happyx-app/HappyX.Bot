@@ -56,7 +56,7 @@
   "report.dm_off": "El report no s'envia per missatge privat: es veu a la web i amb /report.",
   "config.now_public": "Des del {date}, l'admin veurà qui respon, i l'enquesta ho avisarà. Les respostes anteriors continuen sent anònimes.",
   "config.min_people": "El panell i els reports mostren mitjanes i comentaris dels dies en què responen almenys {k} persones.",
-  "config.min_people_lower": "Els dies que ja tenen respostes es queden amb el mínim d’abans.",
+  "config.min_people_lower": "Els dies que ja tenen respostes es queden amb el mínim d'abans.",
   "admin.only": "No tens permís de HappyX per a això. Demana-li a l'administrador de HappyX ({admin}) o a un administrador del servidor des de la web.",
   "error.generic": "Alguna cosa ha fallat. Torna-ho a provar d'aquí a una estona.",
   "error.not_member": "No participes en l'enquesta d'aquest servidor. Fes servir {resume_cmd} allà per apuntar-t'hi.",

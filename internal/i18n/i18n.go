@@ -14,6 +14,7 @@ import (
 	"io/fs"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -152,6 +153,11 @@ func (l *Locale) T(key string, args ...any) string {
 func (l *Locale) Has(key string) bool {
 	_, ok := l.messages[key]
 	return ok
+}
+
+// Decimal writes v with one decimal and the language's decimal separator: 3.7 or 3,7.
+func (l *Locale) Decimal(v float64) string {
+	return strings.Replace(strconv.FormatFloat(v, 'f', 1, 64), ".", l.T("number.decimal"), 1)
 }
 
 // List splits a comma separated message, used for month and weekday names.

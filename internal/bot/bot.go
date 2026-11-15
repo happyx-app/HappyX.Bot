@@ -456,7 +456,85 @@ func (b *Bot) sendSurvey(ctx context.Context, g api.Guild, day string) (delivery
 			to.PolicyURL = b.policyURL()
 		}
 		return surveyMessage(l, g, day, to, icon)
-	}, "survey")
+	}, func(sent *discordgo.Message) { b.closeOldSurveys(l, g, sent) }, "survey")
+}
+
+// oldSurveysChecked is how many messages before today's survey are looked at for earlier ones
+// of the same server: one per working day since the last survey, plus kudos, game and the
+// other servers' surveys in the same DM.
+const oldSurveysChecked = 25
+
+// closeOldSurveys runs once today's survey reached someone: their earlier surveys from this
+// server can no longer be answered, so the unanswered ones turn into the closed grey card and the
+// answered ones lose their buttons. Only today's survey stays open in the DM.
+func (b *Bot) closeOldSurveys(l *i18n.Locale, g api.Guild, today *discordgo.Message) {
+	msgs, err := b.dg.ChannelMessages(today.ChannelID, oldSurveysChecked, today.ID, "", "")
+	if err != nil {
+		b.log.Warn("read DM to close old surveys", "guild", g.DiscordID, "err", err)
+		return
+	}
+	for _, m := range msgs {
+		day, answered, ok := oldSurvey(m, g.DiscordID)
+		if !ok || day >= surveyDay(today, g.DiscordID) {
+			continue
+		}
+		edit := &discordgo.MessageEdit{Channel: m.ChannelID, ID: m.ID, Components: &[]discordgo.MessageComponent{}}
+		if !answered {
+			embeds := []*discordgo.MessageEmbed{closedEmbed(l, g.Name, day)}
+			empty := ""
+			edit.Embeds, edit.Content = &embeds, &empty
+		}
+		if _, err := b.dg.ChannelMessageEditComplex(edit); err != nil {
+			b.log.Warn("close old survey", "guild", g.DiscordID, "err", err)
+		}
+	}
+}
+
+// oldSurvey reads a DM for a survey of guildID that still has buttons to answer or change it:
+// its day, and whether it was answered (it shows the answer, not the faces). A paused survey's
+// «Get it again» is left alone: it still works after the day has passed.
+func oldSurvey(m *discordgo.Message, guildID string) (day string, answered, ok bool) {
+	for _, id := range surveyIDs(m) {
+		if id.GuildID != guildID {
+			return "", false, false
+		}
+		switch id.Action {
+		case actionMood:
+			return id.Day, false, true
+		case actionNote, actionChange:
+			day, answered, ok = id.Day, true, true
+		}
+	}
+	return day, answered, ok
+}
+
+// surveyDay is the day of a survey message of guildID, or "" if it isn't one.
+func surveyDay(m *discordgo.Message, guildID string) string {
+	for _, id := range surveyIDs(m) {
+		if id.GuildID == guildID {
+			return id.Day
+		}
+	}
+	return ""
+}
+
+// surveyIDs are the survey custom IDs of a message's buttons.
+func surveyIDs(m *discordgo.Message) []surveyID {
+	var ids []surveyID
+	for _, c := range m.Components {
+		row, ok := c.(*discordgo.ActionsRow)
+		if !ok {
+			continue
+		}
+		for _, rc := range row.Components {
+			if btn, ok := rc.(*discordgo.Button); ok {
+				if id, ok := parseSurveyID(btn.CustomID); ok {
+					ids = append(ids, id)
+				}
+			}
+		}
+	}
+	return ids
 }
 
 // policyURL is the privacy policy on the dashboard, or empty without WEB_URL.
@@ -502,10 +580,15 @@ func (b *Bot) sendReport(ctx context.Context, g api.Guild, from, to string) (del
 }
 
 func (b *Bot) dm(userID string, msg *discordgo.MessageSend) error {
+	_, err := b.dmMessage(userID, msg)
+	return err
+}
+
+// dmMessage sends msg to the user by DM and returns it as sent.
+func (b *Bot) dmMessage(userID string, msg *discordgo.MessageSend) (*discordgo.Message, error) {
 	ch, err := b.dg.UserChannelCreate(userID)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	_, err = b.dg.ChannelMessageSendComplex(ch.ID, msg)
-	return err
+	return b.dg.ChannelMessageSendComplex(ch.ID, msg)
 }

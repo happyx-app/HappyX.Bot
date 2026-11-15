@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -223,16 +224,149 @@ func TestAnsweredMessage(t *testing.T) {
 	id := surveyID{Action: actionMood, GuildID: "1", Day: "2026-10-23", Mood: 4}
 	a := answeredMessage(es, g, id, "Ana", "")
 	e := a.Embeds[0]
-	if a.Content != "" || e.Description != "### 🙂 ¡Gracias, Ana!\nApuntado: **Bien**.\n\n¿Quieres añadir un comentario? Es opcional." {
+	if a.Content != "" || e.Description != "### 🙂 ¡Gracias, Ana!\nApuntado: **Bien**." {
 		t.Fatalf("answered: %q %q", a.Content, e.Description)
 	}
-	if len(e.Fields) != 0 || len(a.Components) != 1 {
-		t.Fatalf("answered fields or button: %+v %+v", e.Fields, a.Components)
+	if got := buttonIDs(a.Components); len(got) != 2 || got[0].Action != actionNote || got[1].Action != actionChange || got[1].Mood != 4 {
+		t.Fatalf("answered buttons: %+v", got)
 	}
-	// With a comment there's no button.
+	// With a comment, only «Change answer» stays.
 	a = answeredMessage(es, g, id, "Ana", "buena semana\ny tanto")
-	if e := a.Embeds[0]; !strings.HasSuffix(e.Description, "\n> buena semana\n> y tanto") || len(a.Components) != 0 {
-		t.Fatalf("commented: %q %+v", e.Description, a.Components)
+	if e := a.Embeds[0]; !strings.HasSuffix(e.Description, "\n> buena semana\n> y tanto") {
+		t.Fatalf("commented: %q", e.Description)
+	}
+	if got := buttonIDs(a.Components); len(got) != 1 || got[0].Action != actionChange {
+		t.Fatalf("commented buttons: %+v", got)
+	}
+}
+
+// buttonIDs are the survey IDs of the buttons in components.
+func buttonIDs(components []discordgo.MessageComponent) []surveyID {
+	return surveyIDs(received(components))
+}
+
+// received is a message with these components as Discord sends it back: decoded from JSON,
+// with pointers to each component.
+func received(components []discordgo.MessageComponent) *discordgo.Message {
+	raw, err := json.Marshal(map[string]any{"components": components})
+	if err != nil {
+		panic(err)
+	}
+	var m discordgo.Message
+	if err := json.Unmarshal(raw, &m); err != nil {
+		panic(err)
+	}
+	return &m
+}
+
+func TestSurveyOffersOptions(t *testing.T) {
+	es := i18n.Get("es")
+	g := api.Guild{DiscordID: "100000000000000001", Name: "Equipo", Anonymous: true}
+	msg := surveyMessage(es, g, "2026-10-23", surveyRecipient{ID: "2", Name: "Ana"}, "")
+	ids := buttonIDs(msg.Components)
+	if len(ids) != 6 || ids[5].Action != actionOptions {
+		t.Fatalf("survey buttons: five faces and «Options»: %+v", ids)
+	}
+	for _, id := range ids {
+		if id.Action == actionStop {
+			t.Fatal("the survey no longer stops with one click")
+		}
+	}
+}
+
+func TestOptions(t *testing.T) {
+	es := i18n.Get("es")
+	g := api.Guild{DiscordID: "100000000000000001", Name: "Equipo", Anonymous: true, Timezone: "Europe/Madrid", SurveyHour: 13, WorkingDays: presetDays("mon_fri")}
+	b := &Bot{webURL: "https://happyx.example.com"}
+	o := b.optionsMessage(es, g, "2026-10-23", "500000000000000001")
+	if o.Flags&discordgo.MessageFlagsEphemeral == 0 {
+		t.Fatal("the options are only for whoever pressed the button")
+	}
+	if !strings.Contains(o.Content, "**Equipo** · lu–vi a las 13:00 (Europe/Madrid)") || !strings.Contains(o.Content, "nunca quién ha respondido qué") {
+		t.Fatalf("options text: %q", o.Content)
+	}
+	ids := buttonIDs(o.Components)
+	if len(ids) != 2 || ids[0].Action != actionVacation || ids[1].Action != actionPause || ids[1].Msg != "500000000000000001" {
+		t.Fatalf("options buttons: %+v", ids)
+	}
+	row := o.Components[0].(discordgo.ActionsRow).Components
+	if link := row[2].(discordgo.Button); link.URL != "https://happyx.example.com/#/me?g=100000000000000001" {
+		t.Fatalf("evolution link: %+v", link)
+	}
+	// Pausing asks first, with the pause last; the paused card can bring the survey back.
+	c := pauseConfirm(es, g, ids[1])
+	if got := buttonIDs(c.Components); len(got) != 2 || got[0].Action != actionCancel || got[1].Action != actionPauseOK || got[1].Msg != ids[1].Msg {
+		t.Fatalf("pause confirm: %+v", got)
+	}
+	p := pausedEdit(es, g, "2026-10-23", "1", "2")
+	if got := buttonIDs(*p.Components); len(got) != 1 || got[0].Action != actionResume {
+		t.Fatalf("paused card: %+v", got)
+	}
+	// Without the web there is no link.
+	if row := (&Bot{}).optionsButtons(es, g, "2026-10-23", "", true)[0].(discordgo.ActionsRow).Components; len(row) != 2 {
+		t.Fatalf("no web, no link: %+v", row)
+	}
+}
+
+func TestSurveyOpen(t *testing.T) {
+	g := api.Guild{Timezone: "Europe/Madrid"}
+	now := time.Date(2026, 10, 23, 23, 30, 0, 0, time.UTC) // already the 24th in Madrid
+	for day, want := range map[string]bool{"2026-10-24": true, "2026-10-23": true, "2026-10-22": false, "2026-10-25": false} {
+		if got := surveyOpen(g, day, now); got != want {
+			t.Errorf("%s open: %v, want %v", day, got, want)
+		}
+	}
+}
+
+func TestOldSurvey(t *testing.T) {
+	es := i18n.Get("es")
+	g := api.Guild{DiscordID: "100000000000000001", Name: "Equipo", Anonymous: true}
+	other := api.Guild{DiscordID: "100000000000000009", Name: "Otro"}
+	asMessage := func(d *discordgo.InteractionResponseData) *discordgo.Message { return received(d.Components) }
+	open := received(surveyMessage(es, g, "2026-10-22", surveyRecipient{}, "").Components)
+	if day, answered, ok := oldSurvey(open, g.DiscordID); !ok || answered || day != "2026-10-22" {
+		t.Fatalf("unanswered survey: %q %v %v", day, answered, ok)
+	}
+	done := asMessage(answeredMessage(es, g, surveyID{Action: actionMood, GuildID: g.DiscordID, Day: "2026-10-21", Mood: 3}, "Ana", "x"))
+	if day, answered, ok := oldSurvey(done, g.DiscordID); !ok || !answered || day != "2026-10-21" {
+		t.Fatalf("answered survey: %q %v %v", day, answered, ok)
+	}
+	if _, _, ok := oldSurvey(open, other.DiscordID); ok {
+		t.Fatal("another server's survey is left alone")
+	}
+	paused := pausedEdit(es, g, "2026-10-20", "1", "2")
+	if _, _, ok := oldSurvey(received(*paused.Components), g.DiscordID); ok {
+		t.Fatal("a paused survey keeps «Get it again»")
+	}
+	if _, _, ok := oldSurvey(asMessage(closedSurvey(es, g, "2026-10-20")), g.DiscordID); ok {
+		t.Fatal("a closed survey has nothing left to close")
+	}
+	if got := closedSurvey(es, g, "2026-10-22").Embeds[0].Author.Name; got != "Equipo · Encuesta del jueves, 22 de octubre" {
+		t.Fatalf("closed title: %q", got)
+	}
+}
+
+func TestNoteModalSaysWhoReads(t *testing.T) {
+	es := i18n.Get("es")
+	label := func(g api.Guild) string {
+		m := noteModal(es, g, surveyID{Action: actionNote, GuildID: "1", Day: "2026-10-23", Mood: 4})
+		return m.Components[0].(discordgo.ActionsRow).Components[0].(discordgo.TextInput).Label
+	}
+	if got := label(api.Guild{Anonymous: true}); got != "Lo leen los admins, sin tu nombre" {
+		t.Fatalf("anonymous: %q", got)
+	}
+	if got := label(api.Guild{}); got != "Lo leen los admins, con tu nombre" {
+		t.Fatalf("named: %q", got)
+	}
+}
+
+func TestDecimalsAndDates(t *testing.T) {
+	es, en := i18n.Get("es"), i18n.Get("en")
+	if es.Decimal(3.66) != "3,7" || en.Decimal(3.66) != "3.7" {
+		t.Fatalf("decimals: %s %s", es.Decimal(3.66), en.Decimal(3.66))
+	}
+	if got := shortDate(es, "2026-10-19"); got != "19 oct" {
+		t.Fatalf("short date: %q", got)
 	}
 }
 

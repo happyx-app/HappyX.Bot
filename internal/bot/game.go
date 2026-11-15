@@ -119,17 +119,23 @@ func (b *Bot) sendGameGuess(ctx context.Context, g api.Guild, week string) (deli
 }
 
 func (b *Bot) dmAll(g api.Guild, members []api.Member, msg *discordgo.MessageSend, what string) (delivery, error) {
-	return b.dmEach(g, members, func(api.Member) *discordgo.MessageSend { return msg }, what)
+	return b.dmEach(g, members, func(api.Member) *discordgo.MessageSend { return msg }, nil, what)
 }
 
 // dmEach is dmAll with a message built for each member.
-func (b *Bot) dmEach(g api.Guild, members []api.Member, msg func(api.Member) *discordgo.MessageSend, what string) (delivery, error) {
+// dmEach sends msg to each member by DM and, when after is set, calls it with each DM sent.
+func (b *Bot) dmEach(g api.Guild, members []api.Member, msg func(api.Member) *discordgo.MessageSend, after func(sent *discordgo.Message), what string) (delivery, error) {
 	d := delivery{recipients: len(members)}
 	for _, m := range members {
-		if err := b.dm(m.DiscordID, msg(m)); err != nil {
+		sent, err := b.dmMessage(m.DiscordID, msg(m))
+		if err != nil {
 			// Usually the user has DMs from server members turned off.
 			b.log.Warn(what+" DM failed", "guild", g.DiscordID, "user", m.DiscordID, "err", err)
 			d.failed++
+			continue
+		}
+		if after != nil {
+			after(sent)
 		}
 	}
 	if d.failed > 0 && d.failed == len(members) {
@@ -145,7 +151,7 @@ func gameQuestionMessage(l *i18n.Locale, g api.Guild, r api.GameRound, link stri
 	}
 	return &discordgo.MessageSend{
 		Content: content + l.T("game.howto"),
-		Components: gameButtons(link, discordgo.Button{
+		Components: gameButtons(l, link, discordgo.Button{
 			Label: l.T("game.answer_button"), Emoji: &discordgo.ComponentEmoji{Name: "✏️"}, Style: discordgo.PrimaryButton,
 			CustomID: gameID{Action: gameAnswer, GuildID: g.DiscordID, Week: r.Week}.String(),
 		}),
@@ -156,7 +162,7 @@ func gameQuestionMessage(l *i18n.Locale, g api.Guild, r api.GameRound, link stri
 func gameAnsweredMessage(l *i18n.Locale, g api.Guild, question, week, answer, link string) *discordgo.InteractionResponseData {
 	return &discordgo.InteractionResponseData{
 		Content: gameHeader(l, g, question) + "\n" + quote(answer) + "\n" + l.T("game.answered"),
-		Components: gameButtons(link, discordgo.Button{
+		Components: gameButtons(l, link, discordgo.Button{
 			Label: l.T("game.change_button"), Emoji: &discordgo.ComponentEmoji{Name: "✏️"}, Style: discordgo.SecondaryButton,
 			CustomID: gameID{Action: gameAnswer, GuildID: g.DiscordID, Week: week}.String(),
 		}),
@@ -187,10 +193,10 @@ func gameHeader(l *i18n.Locale, g api.Guild, question string) string {
 }
 
 // gameButtons is one row with button and, when there is a dashboard, a link to it.
-func gameButtons(link string, button discordgo.Button) []discordgo.MessageComponent {
+func gameButtons(l *i18n.Locale, link string, button discordgo.Button) []discordgo.MessageComponent {
 	row := []discordgo.MessageComponent{button}
 	if link != "" {
-		row = append(row, discordgo.Button{Label: "HappyX Web", Emoji: &discordgo.ComponentEmoji{Name: "🌐"}, Style: discordgo.LinkButton, URL: link})
+		row = append(row, discordgo.Button{Label: l.T("game.web_button"), Emoji: &discordgo.ComponentEmoji{Name: "🌐"}, Style: discordgo.LinkButton, URL: link})
 	}
 	return []discordgo.MessageComponent{discordgo.ActionsRow{Components: row}}
 }

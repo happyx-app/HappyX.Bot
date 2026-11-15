@@ -352,5 +352,9 @@
   "team.channel_cant": "⚠️ HappyX no puede publicar en {channel}: dale «Ver canal», «Enviar mensajes» e «Insertar enlaces» en ese canal.",
   "setup.team_same_cant": "⚠️ Es el mismo canal: HappyX tampoco puede publicar ahí.",
   "team.told_by": "{user} ya lo contó en {channel}. Solo quien lo publicó puede editarlo o borrarlo.",
-  "team.not_yours": "Solo {user} puede editarlo o borrarlo: lo publicó con su nombre."
+  "team.not_yours": "Solo {user} puede editarlo o borrarlo: lo publicó con su nombre.",
+  "team.told_first": "{user} lo contó en {channel} un momento antes, así que HappyX ha retirado tu mensaje. Solo quien lo publicó puede editarlo o borrarlo. Lo que escribiste:",
+  "team.told_first_kept": "{user} lo contó en {channel} un momento antes. HappyX no ha podido retirar tu mensaje: bórralo desde Discord. Lo que escribiste:",
+  "team.told_self": "Ya lo contaste en {channel}. Para cambiarlo, usa «Editar». Lo que escribiste:",
+  "team.wrote": "Lo que escribiste:"
 }

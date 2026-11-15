@@ -349,5 +349,9 @@
   "team.channel_cant": "⚠️ HappyX no pot publicar a {channel}: dona-li «Veure el canal», «Enviar missatges» i «Inserir enllaços» en aquest canal.",
   "setup.team_same_cant": "⚠️ És el mateix canal: HappyX tampoc hi pot publicar.",
   "team.told_by": "{user} ja ho va explicar a {channel}. Només qui ho va publicar ho pot editar o esborrar.",
-  "team.not_yours": "Només {user} ho pot editar o esborrar: ho va publicar amb el seu nom."
+  "team.not_yours": "Només {user} ho pot editar o esborrar: ho va publicar amb el seu nom.",
+  "team.told_first": "{user} ho va explicar a {channel} un moment abans, així que HappyX ha retirat el teu missatge. Només qui ho va publicar ho pot editar o esborrar. El que vas escriure:",
+  "team.told_first_kept": "{user} ho va explicar a {channel} un moment abans. HappyX no ha pogut retirar el teu missatge: esborra'l des de Discord. El que vas escriure:",
+  "team.told_self": "Ja ho vas explicar a {channel}. Per canviar-ho, fes servir «Editar». El que vas escriure:",
+  "team.wrote": "El que vas escriure:"
 }

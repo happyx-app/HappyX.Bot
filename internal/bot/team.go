@@ -340,11 +340,14 @@ func (b *Bot) publishNote(ctx context.Context, i *discordgo.InteractionCreate, l
 	saved, err := b.api.PublishTeamNote(ctx, g.DiscordID, n)
 	if errors.Is(err, api.ErrConflict) {
 		// Another admin told the team about this period a moment ago: one note per period.
+		key := "team.told_first"
 		if derr := b.dg.ChannelMessageDelete(channel, m.ID); derr != nil {
 			b.log.Warn("take back second team note", "guild", g.DiscordID, "err", derr)
+			key = "team.told_first_kept"
 		}
 		if first, ferr := b.api.PeriodTeamNote(ctx, g.DiscordID, id.From, id.To); ferr == nil {
-			b.answer(i, toldAlready(l, g.DiscordID, first, user, body))
+			b.answer(i, published(l, g.DiscordID, first,
+				l.T(key, "user", "<@"+first.AuthorDiscordID+">", "channel", "<#"+first.ChannelID+">")+"\n"+quote(body), first.AuthorDiscordID == user.ID))
 			return
 		}
 	}
@@ -411,9 +414,9 @@ func (b *Bot) deleteNote(ctx context.Context, i *discordgo.InteractionCreate, l 
 // is, with their own text below so they don't lose it.
 func toldAlready(l *i18n.Locale, guildID string, n api.TeamNote, user *discordgo.User, body string) *discordgo.InteractionResponseData {
 	if n.AuthorDiscordID == user.ID {
-		return published(l, guildID, n, l.T("team.published", "channel", "<#"+n.ChannelID+">")+"\n"+quote(body), true)
+		return published(l, guildID, n, l.T("team.told_self", "channel", "<#"+n.ChannelID+">")+"\n"+quote(body), true)
 	}
-	return published(l, guildID, n, l.T("team.told_by", "user", "<@"+n.AuthorDiscordID+">", "channel", "<#"+n.ChannelID+">")+"\n"+quote(body), false)
+	return published(l, guildID, n, l.T("team.told_by", "user", "<@"+n.AuthorDiscordID+">", "channel", "<#"+n.ChannelID+">")+" "+l.T("team.wrote")+"\n"+quote(body), false)
 }
 
 // gone reports whether Discord says the message or its channel no longer exists.

@@ -352,5 +352,9 @@
   "team.channel_cant": "⚠️ HappyX can't post in {channel}: give it «View Channel», «Send Messages» and «Embed Links» there.",
   "setup.team_same_cant": "⚠️ Same channel: HappyX can't post there either.",
   "team.told_by": "{user} already told the team in {channel}. Only whoever posted it can edit or delete it.",
-  "team.not_yours": "Only {user} can edit or delete it: it was posted under their name."
+  "team.not_yours": "Only {user} can edit or delete it: it was posted under their name.",
+  "team.told_first": "{user} told the team in {channel} a moment earlier, so HappyX took your message down. Only whoever posted it can edit or delete it. What you wrote:",
+  "team.told_first_kept": "{user} told the team in {channel} a moment earlier. HappyX couldn't take your message down: delete it in Discord. What you wrote:",
+  "team.told_self": "You already told the team in {channel}. To change it, use «Edit». What you wrote:",
+  "team.wrote": "What you wrote:"
 }

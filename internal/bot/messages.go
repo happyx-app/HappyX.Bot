@@ -3,6 +3,7 @@ package bot
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"regexp"
 	"slices"
 	"strconv"
@@ -266,16 +267,46 @@ const (
 	maxComments   = 20 // more than this is a wall of text; the rest are counted
 )
 
+// reportOptions is what a report adds when it can: the period before, to compare the average
+// with, and the buttons to tell the team and to open the dashboard.
+type reportOptions struct {
+	// Previous is the report of the period before; nil leaves the comparison out.
+	Previous *api.Report
+	// Monthly says the periods are months, not weeks.
+	Monthly bool
+	// DashboardURL opens the period on the web; empty leaves the button out.
+	DashboardURL string
+	// Tell adds «Tell the team», which publishes in the team channel; it needs one.
+	Tell bool
+}
+
 // reportMessage sends the report as an image, with a short summary and the comments as text
 // (they can be long and are easier to read that way). The embed colour follows the average mood.
 // If the image can't be rendered, the summary also carries the distribution.
 func reportMessage(l *i18n.Locale, g api.Guild, r api.Report) *discordgo.MessageSend {
+	return reportMessageWith(l, g, r, reportOptions{})
+}
+
+func reportMessageWith(l *i18n.Locale, g api.Guild, r api.Report, o reportOptions) *discordgo.MessageSend {
 	embed := &discordgo.MessageEmbed{
 		Title:  fmt.Sprintf("HappyX · %s", g.Name),
 		Footer: &discordgo.MessageEmbedFooter{Text: l.T("report.period", "from", shortDate(l, r.From), "to", shortDate(l, r.To))},
 		Color:  moodColor(r),
 	}
 	msg := &discordgo.MessageSend{Embeds: []*discordgo.MessageEmbed{embed}}
+	var buttons []discordgo.MessageComponent
+	if o.Tell && !r.Withheld && r.Responses > 0 && g.TeamChannel() != "" {
+		buttons = append(buttons, discordgo.Button{
+			Label: l.T("report.tell_button"), Emoji: &discordgo.ComponentEmoji{Name: "💬"}, Style: discordgo.PrimaryButton,
+			CustomID: teamID{Action: teamTell, GuildID: g.DiscordID, From: r.From, To: r.To}.String(),
+		})
+	}
+	if o.DashboardURL != "" {
+		buttons = append(buttons, discordgo.Button{Label: l.T("setup.open_web"), Style: discordgo.LinkButton, URL: o.DashboardURL})
+	}
+	if len(buttons) > 0 {
+		msg.Components = []discordgo.MessageComponent{discordgo.ActionsRow{Components: buttons}}
+	}
 	if r.Withheld {
 		// Every answer fell on a day with too few people to show more than how many: no image, no comments.
 		embed.Color = surveyColor
@@ -286,22 +317,65 @@ func reportMessage(l *i18n.Locale, g api.Guild, r api.Report) *discordgo.Message
 	if png, err := report.Render(l, g.Name, r); err == nil {
 		msg.Files = []*discordgo.File{{Name: "report.png", ContentType: "image/png", Reader: bytes.NewReader(png)}}
 		embed.Image = &discordgo.MessageEmbedImage{URL: "attachment://report.png"}
-		embed.Description = summary(l, r)
+		embed.Description = summary(l, r, o)
 	} else {
-		embed.Description = textSummary(l, r)
+		embed.Description = textSummary(l, r, o)
 	}
 	embed.Description += kudosSection(l, r.Kudos) + comments(l, r.Messages)
 	return msg
 }
 
-func summary(l *i18n.Locale, r api.Report) string {
+// summary is what an admin reads first: the average and how it moved since the period before,
+// how many of the team answered, and how many answers were bad, the ones to act on.
+func summary(l *i18n.Locale, r api.Report, o reportOptions) string {
 	if r.Responses == 0 {
 		return l.T("report.no_responses")
 	}
-	return l.T("report.summary",
-		"average", l.T("report.average"), "value", l.Decimal(r.Average), "emoji", moodEmoji(int(r.Average+0.5)),
-		"responses", l.T("report.responses"), "count", r.Responses,
-		"people", l.T("report.people"), "people_count", r.Respondents) + withheldDays(l, r)
+	avg := l.T("report.average_line", "value", l.Decimal(r.Average), "emoji", moodEmoji(int(r.Average+0.5)))
+	if change := comparison(l, r, o); change != "" {
+		avg += " · " + change
+	}
+	lines := []string{avg, answered(l, r)}
+	if n := r.Counted(); n > 0 {
+		bad := r.Distribution["1"] + r.Distribution["2"]
+		lines = append(lines, l.T("report.low", "bad", l.T("mood.2"), "very_bad", l.T("mood.1"), "n", bad, "of", n))
+	}
+	return strings.Join(lines, "\n") + withheldDays(l, r)
+}
+
+// comparison says how the average moved since the period before, rounded as it is shown. Empty
+// when either period has no average.
+func comparison(l *i18n.Locale, r api.Report, o reportOptions) string {
+	p := o.Previous
+	if p == nil || p.Withheld || p.Counted() == 0 || r.Counted() == 0 {
+		return ""
+	}
+	key := "report.vs_week"
+	if o.Monthly {
+		key = "report.vs_month"
+	}
+	delta := math.Round(r.Average*10)/10 - math.Round(p.Average*10)/10
+	switch {
+	case math.Abs(delta) < 0.05:
+		return l.T(key + "_same")
+	case delta > 0:
+		return l.T(key, "delta", "+"+l.Decimal(delta))
+	default:
+		return l.T(key, "delta", "−"+l.Decimal(-delta))
+	}
+}
+
+// answered is how many people answered, out of those who get the survey when that is known and
+// makes sense (people who left since may have answered too).
+func answered(l *i18n.Locale, r api.Report) string {
+	switch {
+	case r.Audience >= r.Respondents && r.Audience > 0:
+		return l.T("report.answered_of", "n", r.Respondents, "of", r.Audience)
+	case r.Respondents == 1:
+		return l.T("report.answered_one")
+	default:
+		return l.T("report.answered", "n", r.Respondents)
+	}
 }
 
 // withheldDays names the days with too few people, which count only in the answers, one line
@@ -416,15 +490,12 @@ func moodColor(r api.Report) int {
 	}
 }
 
-func textSummary(l *i18n.Locale, r api.Report) string {
+func textSummary(l *i18n.Locale, r api.Report, o reportOptions) string {
 	if r.Responses == 0 {
 		return l.T("report.no_responses") + "\n\n"
 	}
 	var b strings.Builder
-	b.WriteString(l.T("report.summary",
-		"average", l.T("report.average"), "value", l.Decimal(r.Average), "emoji", moodEmoji(int(r.Average+0.5)),
-		"responses", l.T("report.responses"), "count", r.Responses,
-		"people", l.T("report.people"), "people_count", r.Respondents) + withheldDays(l, r))
+	b.WriteString(summary(l, r, o))
 	b.WriteString("\n\n")
 	for i := len(moodEmojis); i >= 1; i-- {
 		n := r.Distribution[fmt.Sprint(i)]

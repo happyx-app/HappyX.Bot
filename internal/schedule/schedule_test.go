@@ -113,3 +113,27 @@ func TestNextSurvey(t *testing.T) {
 		t.Error("empty working days mean Monday to Friday")
 	}
 }
+
+func TestSummaryDue(t *testing.T) {
+	s := Settings{Timezone: "Europe/Madrid", SurveyHour: 13}
+	at := func(v string) time.Time {
+		tm, err := time.Parse(time.RFC3339, v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return tm
+	}
+	if week, due := SummaryDue(s, at("2026-11-16T12:00:00Z")); !due || week != "2026-11-09" {
+		t.Errorf("Monday 13:00 in Madrid: %q %v", week, due)
+	}
+	if _, due := SummaryDue(s, at("2026-11-16T11:59:00Z")); due {
+		t.Error("before the survey hour")
+	}
+	if _, due := SummaryDue(s, at("2026-11-17T12:00:00Z")); due {
+		t.Error("only on Monday")
+	}
+	// Sunday 23:30 UTC is already Monday 00:30 in Madrid, but before the hour.
+	if _, due := SummaryDue(Settings{Timezone: "Europe/Madrid", SurveyHour: 0}, at("2026-11-15T23:30:00Z")); !due {
+		t.Error("Monday in the server's timezone")
+	}
+}

@@ -119,3 +119,14 @@ func gameDue(s Settings, now time.Time, first, last int) (string, bool) {
 	}
 	return today.AddDate(0, 0, -offset).Format(DateLayout), true
 }
+
+// SummaryDue reports whether the past week's summary should go out in the team channel: on
+// Monday from the survey hour, like the weekly report. week is the past week's Monday.
+func SummaryDue(s Settings, now time.Time) (week string, due bool) {
+	local := now.In(s.location())
+	today := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.UTC)
+	if today.Weekday() != time.Monday || local.Hour() < s.SurveyHour {
+		return "", false
+	}
+	return today.AddDate(0, 0, -7).Format(DateLayout), true
+}

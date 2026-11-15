@@ -40,6 +40,8 @@ const (
 	optUser      = "user"
 	optMessage   = "message"
 	optKudosChan = "kudos_channel"
+	optTeamChan  = "team_channel"
+	optSummary   = "team_summary"
 	optGames     = "games"
 	optWorkDays  = "working_days"
 	optSurvey    = "survey"
@@ -102,6 +104,8 @@ func commands() []*discordgo.ApplicationCommand {
 	kudosMessage.Required, kudosMessage.MinLength, kudosMessage.MaxLength = true, &one, kudosMaxLength
 	kudosChannel := opt(discordgo.ApplicationCommandOptionChannel, optKudosChan)
 	kudosChannel.ChannelTypes = []discordgo.ChannelType{discordgo.ChannelTypeGuildText, discordgo.ChannelTypeGuildNews}
+	teamChannel := opt(discordgo.ApplicationCommandOptionChannel, optTeamChan)
+	teamChannel.ChannelTypes = kudosChannel.ChannelTypes
 	workingDays := opt(discordgo.ApplicationCommandOptionString, optWorkDays)
 	for _, p := range workingDayPresets {
 		workingDays.Choices = append(workingDays.Choices, &discordgo.ApplicationCommandOptionChoice{
@@ -145,6 +149,8 @@ func commands() []*discordgo.ApplicationCommand {
 				language,
 				opt(discordgo.ApplicationCommandOptionUser, optAdmin),
 				kudosChannel,
+				teamChannel,
+				opt(discordgo.ApplicationCommandOptionBoolean, optSummary),
 				opt(discordgo.ApplicationCommandOptionBoolean, optGames),
 				workingDays,
 			),
@@ -177,6 +183,10 @@ func (b *Bot) onInteraction(s *discordgo.Session, i *discordgo.InteractionCreate
 		b.handleCommand(ctx, i)
 	case discordgo.InteractionMessageComponent:
 		customID := i.MessageComponentData().CustomID
+		if id, ok := parseTeamID(customID); ok {
+			b.handleTeam(ctx, i, id)
+			return
+		}
 		if id, ok := parseSetupID(customID); ok {
 			b.handleSetup(ctx, i, id)
 			return
@@ -191,6 +201,10 @@ func (b *Bot) onInteraction(s *discordgo.Session, i *discordgo.InteractionCreate
 		b.handleSurveyButton(ctx, i)
 	case discordgo.InteractionModalSubmit:
 		data := i.ModalSubmitData()
+		if id, ok := parseTeamID(data.CustomID); ok {
+			b.handleTeam(ctx, i, id)
+			return
+		}
 		if id, ok := parseGameID(data.CustomID); ok && id.Action == gameAnswerModal {
 			b.handleGameModal(ctx, i, id, data)
 			return
@@ -265,7 +279,7 @@ func (b *Bot) handleSurveyButton(ctx context.Context, i *discordgo.InteractionCr
 			return
 		}
 		id.Action = actionMood
-		b.respond(i, discordgo.InteractionResponseUpdateMessage, answeredMessage(l, g, id, b.userName(id.GuildID, user), e.Message))
+		b.respond(i, discordgo.InteractionResponseUpdateMessage, b.withTold(ctx, l, id, answeredMessage(l, g, id, b.userName(id.GuildID, user), e.Message)))
 	case actionChange, actionNote:
 		if !surveyOpen(g, id.Day, b.now()) {
 			// An answer from a day that can't be changed any more keeps what it shows.
@@ -333,7 +347,7 @@ func (b *Bot) handleNoteModal(ctx context.Context, i *discordgo.InteractionCreat
 		b.surveyError(i, l, g, id, err)
 		return
 	}
-	b.respond(i, discordgo.InteractionResponseUpdateMessage, answeredMessage(l, g, id, b.userName(id.GuildID, user), comment))
+	b.respond(i, discordgo.InteractionResponseUpdateMessage, b.withTold(ctx, l, id, answeredMessage(l, g, id, b.userName(id.GuildID, user), comment)))
 }
 
 func modalValue(data discordgo.ModalSubmitInteractionData, field string) string {
@@ -466,7 +480,7 @@ func (b *Bot) statusMessage(l *i18n.Locale, g api.Guild, you, offLine, vacationL
 		text += "\n\n" + l.T("status.settings",
 			"frequency", l.T("freq."+g.ReportFrequency), "admin", "<@"+g.AdminDiscordID+">",
 			"language", i18n.Get(g.Language).Name, "participants", participants) +
-			reportDMLine(l, g) + "\n" + kudosChannelLine(l, g) + "\n" + gameLine(l, g)
+			reportDMLine(l, g) + "\n" + kudosChannelLine(l, g) + "\n" + teamChannelLine(l, g) + b.teamChannelWarning(l, g) + "\n" + gameLine(l, g)
 	}
 	return &discordgo.InteractionResponseData{
 		Content:         text,
@@ -518,6 +532,12 @@ func (b *Bot) cmdConfig(ctx context.Context, i *discordgo.InteractionCreate, l *
 		case optKudosChan:
 			v := o.ChannelValue(nil).ID
 			p.KudosChannelID = &v
+		case optTeamChan:
+			v := o.ChannelValue(nil).ID
+			p.TeamChannelID = &v
+		case optSummary:
+			v := o.BoolValue()
+			p.TeamSummary = &v
 		case optGames:
 			v := o.BoolValue()
 			p.GamesEnabled = &v
@@ -545,6 +565,9 @@ func (b *Bot) cmdConfig(ctx context.Context, i *discordgo.InteractionCreate, l *
 		l = i18n.Get(g.Language) // confirm in the language just chosen
 	}
 	s := configSaved(l, g, p, before)
+	if p.TeamChannelID != nil || p.KudosChannelID != nil || p.TeamSummary != nil {
+		s += b.teamChannelWarning(l, g)
+	}
 	if p.SurveyEnabled != nil {
 		s += "\n" + b.surveyNotice(ctx, l, g, true)
 	} else if line := b.surveyOffLine(l, g); line != "" {
@@ -560,7 +583,7 @@ func configSaved(l *i18n.Locale, g api.Guild, p api.GuildPatch, before int) stri
 	s := l.T("config.saved",
 		"days", workingDaysText(l, g.WorkingDays), "hour", fmt.Sprintf("%02d", g.SurveyHour), "timezone", g.Timezone,
 		"frequency", l.T("freq."+g.ReportFrequency), "admin", "<@"+g.AdminDiscordID+">",
-		"anonymous", yesNo(l, g.Anonymous), "language", i18n.Get(g.Language).Name) + reportDMLine(l, g) + "\n" + kudosChannelLine(l, g) + "\n" + gameLine(l, g)
+		"anonymous", yesNo(l, g.Anonymous), "language", i18n.Get(g.Language).Name) + reportDMLine(l, g) + "\n" + kudosChannelLine(l, g) + "\n" + teamChannelLine(l, g) + "\n" + gameLine(l, g)
 	if p.Anonymous != nil && !*p.Anonymous && g.NamedSince != "" {
 		s += "\n" + l.T("config.now_public", "date", shortDate(l, g.NamedSince))
 	}
@@ -586,9 +609,11 @@ func (b *Bot) cmdReport(ctx context.Context, i *discordgo.InteractionCreate, l *
 		return
 	}
 	from, to := "", "" // the API defaults to the last completed period
+	completed := true
 	for _, o := range opts {
 		if o.Name == optPeriod && o.StringValue() == periodCurrent {
 			from, to = schedule.CurrentPeriod(schedule.Settings{Timezone: g.Timezone, ReportFrequency: g.ReportFrequency}, b.now())
+			completed = false
 		}
 	}
 	r, err := b.api.Report(ctx, i.GuildID, from, to)
@@ -596,9 +621,12 @@ func (b *Bot) cmdReport(ctx context.Context, i *discordgo.InteractionCreate, l *
 		b.replyError(i, l, err)
 		return
 	}
-	msg := reportMessage(l, g, r)
+	o := b.reportOptions(ctx, g, r, completed)
+	// Telling the team is for whoever can change the settings, like the report's own DM.
+	o.Tell = completed && b.hasAccess(ctx, i, user, api.AccessManage)
+	msg := reportMessageWith(l, g, r, o)
 	b.respond(i, discordgo.InteractionResponseChannelMessageWithSource, &discordgo.InteractionResponseData{
-		Embeds: msg.Embeds, Files: msg.Files, Flags: discordgo.MessageFlagsEphemeral,
+		Embeds: msg.Embeds, Files: msg.Files, Components: msg.Components, Flags: discordgo.MessageFlagsEphemeral,
 	})
 }
 
@@ -621,6 +649,13 @@ func (b *Bot) allowed(ctx context.Context, i *discordgo.InteractionCreate, l *i1
 		return false
 	}
 	return true
+}
+
+// hasAccess is allowed without answering: whether the caller has at least the need level.
+func (b *Bot) hasAccess(ctx context.Context, i *discordgo.InteractionCreate, user *discordgo.User, need string) bool {
+	discordAdmin := i.Member != nil && i.Member.Permissions&discordgo.PermissionAdministrator != 0
+	level, err := b.api.Access(ctx, i.GuildID, user.ID, discordAdmin)
+	return err == nil && accessRank(level) >= accessRank(need)
 }
 
 func accessRank(level string) int {

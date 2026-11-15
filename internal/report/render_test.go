@@ -6,8 +6,11 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/fogleman/gg"
 
 	"github.com/happyx-app/HappyX.Bot/internal/api"
 	"github.com/happyx-app/HappyX.Bot/internal/i18n"
@@ -67,6 +70,27 @@ func TestRender(t *testing.T) {
 					}
 				}
 			})
+		}
+	}
+}
+
+// The footer says what the report leaves out; in every language it breaks into lines that fit
+// rather than running off the image.
+func TestFooterFits(t *testing.T) {
+	r := sample(7, nil)
+	r.Days[1].Withheld = true
+	r.Messages = append(r.Messages, api.ReportMsg{Message: "otro"}, api.ReportMsg{Message: "y otro"})
+	dc := gg.NewContext(1, 1)
+	setFont(dc, regular, 18)
+	for _, lang := range i18n.Codes() {
+		lines := footerLines(i18n.Get(lang), r)
+		if got := strings.Count(strings.Join(lines, " · "), " · "); got != 2 {
+			t.Errorf("%s: footer has %d separators, want 2 (three parts): %q", lang, got, lines)
+		}
+		for _, line := range lines {
+			if w, _ := dc.MeasureString(line); w > width-2*pad {
+				t.Errorf("%s: footer line %q is %.0f wide, room is %.0f", lang, line, w, width-2*pad)
+			}
 		}
 	}
 }

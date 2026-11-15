@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -42,10 +43,7 @@ const surveyColor = 0x8b5cf6
 // anonymity notice, and the mood buttons (just their emoji) below. icon is the server's icon, if any.
 func surveyMessage(l *i18n.Locale, g api.Guild, day string, to surveyRecipient, icon string) *discordgo.MessageSend {
 	buttons := moodButtons(g, day, actionMood)
-	privacy := l.T("survey.anonymous")
-	if !g.Anonymous {
-		privacy = l.T("survey.named")
-	}
+	privacy := surveyPrivacy(l, g, day)
 	embed := &discordgo.MessageEmbed{
 		Author:      &discordgo.MessageEmbedAuthor{Name: l.T("survey.title", "guild", g.Name)},
 		Description: surveyText(l, g, day, to),
@@ -122,6 +120,25 @@ func answeredQuote(m *discordgo.Message) string {
 // noButtons keeps a message as it is but takes its buttons away.
 func noButtons() *discordgo.InteractionResponseData {
 	return &discordgo.InteractionResponseData{Components: []discordgo.MessageComponent{}}
+}
+
+// namedNoticeDays is how long, after anonymity is turned off, the survey says since when the
+// admins see who answers.
+const namedNoticeDays = 7
+
+// surveyPrivacy is the survey's footer: whether this day's answer is anonymous. Around the day
+// anonymity is turned off it also says from which day answers carry names, so the team learns it
+// from the survey itself before answering.
+func surveyPrivacy(l *i18n.Locale, g api.Guild, day string) string {
+	switch {
+	case g.NamedSoon(day):
+		return l.T("survey.anonymous_until", "date", shortDate(l, g.NamedSince))
+	case g.AnonymousOn(day):
+		return l.T("survey.anonymous")
+	case g.NamedSince != "" && day < parseDay(g.NamedSince).AddDate(0, 0, namedNoticeDays).Format(isoDate):
+		return l.T("survey.named_since", "date", shortDate(l, g.NamedSince))
+	}
+	return l.T("survey.named")
 }
 
 var surveyVar = regexp.MustCompile(`\{\{\s*([a-z.]+)\s*\}\}`)
@@ -221,7 +238,7 @@ func closedEmbed(l *i18n.Locale, guildName, day string) *discordgo.MessageEmbed 
 func noteModal(l *i18n.Locale, g api.Guild, id surveyID) *discordgo.InteractionResponseData {
 	id.Action = actionNoteModal
 	label := l.T("modal.label_anonymous")
-	if !g.Anonymous {
+	if !g.AnonymousOn(id.Day) {
 		label = l.T("modal.label_named")
 	}
 	return &discordgo.InteractionResponseData{
@@ -259,6 +276,13 @@ func reportMessage(l *i18n.Locale, g api.Guild, r api.Report) *discordgo.Message
 		Color:  moodColor(r),
 	}
 	msg := &discordgo.MessageSend{Embeds: []*discordgo.MessageEmbed{embed}}
+	if r.Withheld {
+		// Every answer fell on a day with too few people to show more than how many: no image, no comments.
+		embed.Color = surveyColor
+		embed.Description = l.T("report.withheld", "n", r.Respondents, "k", max(r.AnonymityThreshold, api.MinAnonymityThreshold)) +
+			kudosSection(l, r.Kudos)
+		return msg
+	}
 	if png, err := report.Render(l, g.Name, r); err == nil {
 		msg.Files = []*discordgo.File{{Name: "report.png", ContentType: "image/png", Reader: bytes.NewReader(png)}}
 		embed.Image = &discordgo.MessageEmbedImage{URL: "attachment://report.png"}
@@ -277,11 +301,40 @@ func summary(l *i18n.Locale, r api.Report) string {
 	return l.T("report.summary",
 		"average", l.T("report.average"), "value", l.Decimal(r.Average), "emoji", moodEmoji(int(r.Average+0.5)),
 		"responses", l.T("report.responses"), "count", r.Responses,
-		"people", l.T("report.people"), "people_count", r.Respondents)
+		"people", l.T("report.people"), "people_count", r.Respondents) + withheldDays(l, r)
 }
 
-// comments lists the comments as quotes with the day (and author, when not anonymous) underneath,
-// stopping at the budget with a count of the rest.
+// withheldDays names the days with too few people, which count only in the answers, one line
+// per threshold they were judged by (they differ only after the guild lowered it). Empty when
+// there are none.
+func withheldDays(l *i18n.Locale, r api.Report) string {
+	byK := map[int][]string{}
+	var ks []int
+	for _, d := range r.Days {
+		if !d.Withheld {
+			continue
+		}
+		k := d.AnonymityThreshold
+		if k == 0 { // older APIs
+			k = r.AnonymityThreshold
+		}
+		k = max(k, api.MinAnonymityThreshold)
+		if byK[k] == nil {
+			ks = append(ks, k)
+		}
+		byK[k] = append(byK[k], dayLabel(l, d.Day))
+	}
+	slices.Sort(ks)
+	var b strings.Builder
+	for _, k := range ks {
+		b.WriteString("\n-# " + l.T("report.withheld_days", "days", strings.Join(byK[k], ", "), "k", k))
+	}
+	return b.String()
+}
+
+// comments lists the comments as quotes, stopping at the budget with a count of the rest. An
+// anonymous comment is only its text, in the order the API gives (unrelated to when it was
+// written); a named one has its mood, day and author.
 func comments(l *i18n.Locale, msgs []api.ReportMsg) string {
 	if len(msgs) == 0 {
 		return ""
@@ -289,12 +342,18 @@ func comments(l *i18n.Locale, msgs []api.ReportMsg) string {
 	var b strings.Builder
 	b.WriteString("\n\n### 💬 " + l.T("report.comments") + "\n")
 	for i, m := range msgs {
-		meta := dayLabel(l, m.Day)
-		if m.Username != "" {
-			meta += " · " + m.Username
+		entry := quote(truncate(m.Message, commentMax)) + "\n"
+		if i > 0 && msgs[i-1].Day == "" {
+			entry = "\n" + entry // a blank line keeps two quotes from running into one
 		}
-		entry := fmt.Sprintf("> %s %s\n-# %s\n", moodEmoji(m.Mood),
-			strings.ReplaceAll(truncate(m.Message, commentMax), "\n", "\n> "), meta)
+		if m.Day != "" {
+			meta := dayLabel(l, m.Day)
+			if m.Username != "" {
+				meta += " · " + m.Username
+			}
+			entry = fmt.Sprintf("> %s %s\n-# %s\n", moodEmoji(m.Mood),
+				strings.ReplaceAll(truncate(m.Message, commentMax), "\n", "\n> "), meta)
+		}
 		if i == maxComments || b.Len()+len(entry) > commentBudget {
 			b.WriteString("-# " + l.T("report.more_comments", "n", len(msgs)-i) + "\n")
 			break
@@ -365,11 +424,11 @@ func textSummary(l *i18n.Locale, r api.Report) string {
 	b.WriteString(l.T("report.summary",
 		"average", l.T("report.average"), "value", l.Decimal(r.Average), "emoji", moodEmoji(int(r.Average+0.5)),
 		"responses", l.T("report.responses"), "count", r.Responses,
-		"people", l.T("report.people"), "people_count", r.Respondents))
+		"people", l.T("report.people"), "people_count", r.Respondents) + withheldDays(l, r))
 	b.WriteString("\n\n")
 	for i := len(moodEmojis); i >= 1; i-- {
 		n := r.Distribution[fmt.Sprint(i)]
-		fmt.Fprintf(&b, "%s %s %d\n", moodEmoji(i), bar(n, r.Responses), n)
+		fmt.Fprintf(&b, "%s %s %d\n", moodEmoji(i), bar(n, r.Counted()), n)
 	}
 	return b.String() + "\n"
 }

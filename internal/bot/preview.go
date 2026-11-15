@@ -37,6 +37,7 @@ const (
 // Previews builds every scene in language code.
 func Previews(code string) []Preview {
 	l := i18n.Get(code)
+	day := "2026-10-23"
 	g := api.Guild{DiscordID: PreviewGuildID, Name: "Equipo Demo", AdminDiscordID: PreviewAdminID, Anonymous: true,
 		Timezone: "Europe/Madrid", SurveyHour: 13, ReportFrequency: "weekly", Language: code, KudosChannelID: PreviewChannelID,
 		WorkingDays: presetDays("mon_fri")}
@@ -44,15 +45,20 @@ func Previews(code string) []Preview {
 	cmdID := "900000000000000001" // as once the commands are registered: mentions are clickable
 	b.commandID.Store(&cmdID)
 	public, no := g, false
-	public.Anonymous = false
+	public.Anonymous, public.NamedSince = false, "2026-10-24" // turned off today: names from tomorrow
+	five, fivePeople := 5, g
+	fivePeople.AnonymityThreshold = 5
+	three, threePeople := 3, g
+	threePeople.AnonymityThreshold = 3
+	// The Monday after: names started on Saturday 24, as the survey above announced.
+	namedDay := "2026-10-26"
 	sunToThu := g
 	sunToThu.WorkingDays = presetDays("sun_thu")
-	day := "2026-10-23"
 	ana := surveyRecipient{ID: PreviewAnaID, Name: "Ana", Streak: 5}
 	anaFirst := ana
 	anaFirst.PolicyURL = "https://happyx.example.com/#/privacy-policy"
 	custom := g
-	custom.SurveyMessage = "👋 ¡Hola {{user.name}}! ¿Cómo te encuentras hoy, {{weekday}}? ({{guild.name}})\nLlevas {{user.streak}} días seguidos respondiendo 🔥"
+	custom.SurveyMessage = "👋 ¡Hola {{user.name}}! ¿Cómo te encuentras hoy, {{weekday}}? ({{guild.name}})"
 	kudosMsg := "Gracias por echarme un cable con el despliegue del viernes, sin ti no llegábamos 🚀"
 	link := "https://discord.com/channels/" + PreviewGuildID + "/" + PreviewChannelID + "/1"
 
@@ -75,6 +81,8 @@ func Previews(code string) []Preview {
 
 	return append([]Preview{
 		{Title: "Daily survey", Channel: "DM", Msg: surveyMessage(l, g, day, ana, PreviewGuildIcon)},
+		{Title: "Daily survey the day anonymity is turned off (names from tomorrow)", Channel: "DM", Msg: surveyMessage(l, public, day, ana, PreviewGuildIcon)},
+		{Title: "Daily survey the first week with names", Channel: "DM", Msg: surveyMessage(l, public, namedDay, ana, PreviewGuildIcon)},
 		{Title: "Daily survey with the admin's own message", Channel: "DM", Msg: surveyMessage(l, custom, day, ana, PreviewGuildIcon)},
 		{Title: "Daily survey until the first answer since the privacy policy's date", Channel: "DM", Msg: surveyMessage(l, g, day, anaFirst, PreviewGuildIcon)},
 		{Title: "Options (from the survey)", Channel: "DM", Ephemeral: true, Msg: data(b.optionsMessage(l, g, day, "1"))},
@@ -106,9 +114,9 @@ func Previews(code string) []Preview {
 		{Title: "Status (an admin)", Channel: "#general", Command: "/happyx status", Ephemeral: true,
 			Msg: data(b.statusMessage(l, g, l.T("status.you_receiving"), "", "", false, true, 12))},
 		{Title: "Changing the working days", Channel: "#general", Command: "/happyx config working_days:" + l.T("days.sun_thu"), Ephemeral: true,
-			Msg: text(configSaved(l, sunToThu, api.GuildPatch{WorkingDays: sunToThu.WorkingDays}))},
+			Msg: text(configSaved(l, sunToThu, api.GuildPatch{WorkingDays: sunToThu.WorkingDays}, 0))},
 		{Title: "Turning anonymity off", Channel: "#general", Command: "/happyx config anonymous:False", Ephemeral: true,
-			Msg: text(configSaved(l, public, api.GuildPatch{Anonymous: &no}))},
+			Msg: text(configSaved(l, public, api.GuildPatch{Anonymous: &no}, 0))},
 		{Title: "Pause", Channel: "#general", Command: "/happyx pause", Ephemeral: true, Msg: text(l.T("pause.done", "resume_cmd", b.resumeMention()))},
 		{Title: "Vacation", Channel: "#general", Command: "/happyx vacation from:20/12 to:6/1", Ephemeral: true,
 			Msg: text(l.T("vacation.done", "from", discordDate("2026-12-20"), "to", discordDate("2027-01-06"), "resume_cmd", b.resumeMention()))},
@@ -117,8 +125,14 @@ func Previews(code string) []Preview {
 		{Title: "Vacation an admin set on the web", Channel: "DM", Msg: text(l.T("vacation.notice", "admin", "<@"+PreviewAdminID+">", "server", g.Name,
 			"from", discordDate("2026-12-20"), "to", discordDate("2027-01-06"), "link", "<https://happyx.example.com/#/me>"))},
 		{Title: "Weekly report", Channel: "DM", Msg: reportMessage(l, g, previewReport())},
+		{Title: "Weekly report with a day below the threshold", Channel: "DM", Msg: reportMessage(l, g, previewPartlyWithheld())},
+		{Title: "Weekly report when no day reached the threshold", Channel: "DM", Msg: reportMessage(l, g, previewWithheld())},
+		{Title: "Setting the fewest people", Channel: "#general", Command: "/happyx config min_people:5", Ephemeral: true,
+			Msg: text(configSaved(l, fivePeople, api.GuildPatch{AnonymityThreshold: &five}, 3))},
+		{Title: "Lowering the fewest people", Channel: "#general", Command: "/happyx config min_people:3", Ephemeral: true,
+			Msg: text(configSaved(l, threePeople, api.GuildPatch{AnonymityThreshold: &three}, 5))},
 		{Title: "Turning the game on", Channel: "#general", Command: "/happyx config games:True", Ephemeral: true,
-			Msg: text(configSaved(l, games, api.GuildPatch{GamesEnabled: &yes}))},
+			Msg: text(configSaved(l, games, api.GuildPatch{GamesEnabled: &yes}, 0))},
 		{Title: "«Who's who?» question (Monday)", Channel: "DM", Msg: gameQuestionMessage(l, g, api.GameRound{Week: week, Question: question}, gameLink)},
 		{Title: "A question the team proposed (Monday)", Channel: "DM", Msg: gameQuestionMessage(l, g, api.GameRound{Week: week, Question: question, Proposed: true}, gameLink)},
 		{Title: "After answering the game", Channel: "DM", Msg: data(gameAnsweredMessage(l, g, question, week, "Astronauta, y luego bombera 🚒", gameLink))},
@@ -195,11 +209,13 @@ func setupPreviews(l *i18n.Locale, g api.Guild) []Preview {
 
 func previewReport() api.Report {
 	r := api.Report{From: "2026-10-19", To: "2026-10-25", Anonymous: true, Responses: 41, Respondents: 9, Average: 3.7,
-		Distribution: map[string]int{"1": 1, "2": 4, "3": 10, "4": 17, "5": 9},
+		Distribution:       map[string]int{"1": 1, "2": 4, "3": 10, "4": 17, "5": 9},
+		AnonymityThreshold: 3,
+		// Anonymous comments: only their text, in an order unrelated to the day.
 		Messages: []api.ReportMsg{
-			{Day: "2026-10-20", Mood: 2, Message: "Muchas reuniones seguidas, me cuesta concentrarme"},
-			{Day: "2026-10-22", Mood: 5, Message: "¡Por fin salió la release!"},
-			{Day: "2026-10-23", Mood: 4, Message: "Semana intensa pero buen ambiente"},
+			{Message: "Semana intensa pero buen ambiente"},
+			{Message: "Muchas reuniones seguidas, me cuesta concentrarme"},
+			{Message: "¡Por fin salió la release!"},
 		},
 		Kudos: api.KudosSummary{Count: 6, Givers: 5, Receivers: 4, Highlights: []api.Kudos{
 			{Day: "2026-10-23", FromUsername: "ana", ToUsername: "bea", Message: "Gracias por echarme un cable con el despliegue del viernes, sin ti no llegábamos 🚀"},
@@ -210,6 +226,27 @@ func previewReport() api.Report {
 	// Monday to Friday: the API leaves out non-working days nobody answered on.
 	for i, avg := range []float64{3.2, 2.9, 3.8, 4.3, 4.1} {
 		r.Days = append(r.Days, api.ReportDay{Day: fmt.Sprintf("2026-10-%d", 19+i), Average: avg, Responses: 8})
+	}
+	return r
+}
+
+// previewPartlyWithheld is the weekly report where only two people answered on Tuesday: that
+// day counts only in the answers, not in the average, the distribution or the comments.
+func previewPartlyWithheld() api.Report {
+	r := previewReport()
+	r.Days[1] = api.ReportDay{Day: r.Days[1].Day, Responses: 2, Withheld: true}
+	r.Responses = 34
+	r.Distribution = map[string]int{"1": 1, "2": 3, "3": 8, "4": 13, "5": 7}
+	r.Average = 3.7
+	return r
+}
+
+// previewWithheld is a week where no day had answers from 3 people, the threshold.
+func previewWithheld() api.Report {
+	r := api.Report{From: "2026-10-19", To: "2026-10-25", Anonymous: true, AnonymityThreshold: 3, Withheld: true,
+		Responses: 6, Respondents: 2, Distribution: map[string]int{}}
+	for i := range 5 {
+		r.Days = append(r.Days, api.ReportDay{Day: fmt.Sprintf("2026-10-%d", 19+i), Responses: 1 + i%2, Withheld: true})
 	}
 	return r
 }

@@ -38,6 +38,7 @@ const (
 	setupPage      = "page"      // button: go to Page
 	setupLanguage  = "lang"      // select
 	setupAnonymous = "anon"      // select
+	setupMinPeople = "minpeople" // select: the anonymity threshold
 	setupHour      = "hour"      // select
 	setupTimezone  = "tz"        // select
 	setupDays      = "days"      // select
@@ -142,6 +143,11 @@ func setupComponents(l *i18n.Locale, d setupData, page string) []discordgo.Messa
 				{Label: l.T("setup.anonymous"), Description: l.T("setup.anonymous_desc"), Value: "yes", Default: g.Anonymous},
 				{Label: l.T("setup.named"), Description: l.T("setup.named_desc"), Value: "no", Default: !g.Anonymous},
 			}),
+		)
+		if g.Anonymous {
+			c = append(c, sel(setupMinPeople, l.T("setup.min_people"), minPeopleOptions(l, g.Threshold())))
+		}
+		c = append(c,
 			label(l.T("setup.hour")), sel(setupHour, l.T("setup.hour"), hourOptions(g.SurveyHour)),
 			sel(setupTimezone, l.T("setup.timezone"), timezoneOptions(g.Timezone)),
 			label(l.T("setup.days")), sel(setupDays, l.T("setup.days"), dayOptions(l, g.WorkingDays)),
@@ -442,6 +448,12 @@ func setupPatch(id setupID, values []string) (p api.GuildPatch, page string, sav
 		p.Language = &v
 	case setupAnonymous:
 		p.Anonymous = &yes
+	case setupMinPeople:
+		k, err := strconv.Atoi(v)
+		if err != nil || k < api.MinAnonymityThreshold || k > maxAnonymityThreshold {
+			return p, page, false, false
+		}
+		p.AnonymityThreshold = &k
 	case setupHour:
 		h, err := strconv.Atoi(v)
 		if err != nil || h < 0 || h > 23 {
@@ -707,7 +719,7 @@ func introComponents(l *i18n.Locale, g api.Guild, who, admin, pause string) []di
 		"### " + l.T("intro.title"),
 		l.T("intro.survey", "days", daysLabel(l, g.WorkingDays), "hour", fmt.Sprintf("%02d", g.SurveyHour),
 			"timezone", g.Timezone, "who", who, "question", l.T("survey.question")),
-		l.T(privacy, "admin", admin),
+		l.T(privacy, "admin", admin, "k", g.Threshold()),
 	}
 	if g.GamesEnabled {
 		lines = append(lines, l.T("intro.game"))
@@ -844,4 +856,26 @@ func (b *Bot) handleTestButton(ctx context.Context, i *discordgo.InteractionCrea
 	g, l := b.guildAndLocale(ctx, id.GuildID)
 	b.respond(i, discordgo.InteractionResponseUpdateMessage, testAnswered(l, g, b.userName(id.GuildID, interactionUser(i)), id.Mood))
 	return true
+}
+
+// minPeopleThresholds are the anonymity thresholds the assistant offers; /happyx config and the
+// web take any from 3 to 50.
+var minPeopleThresholds = []int{3, 4, 5, 6, 8, 10}
+
+// minPeopleOptions offers the anonymity thresholds, current selected, adding it if it is another.
+func minPeopleOptions(l *i18n.Locale, current int) []discordgo.SelectMenuOption {
+	ks := minPeopleThresholds
+	if !slices.Contains(ks, current) {
+		ks = append(slices.Clone(ks), current)
+		slices.Sort(ks)
+	}
+	var out []discordgo.SelectMenuOption
+	for _, k := range ks {
+		o := discordgo.SelectMenuOption{Label: l.T("setup.min_people_n", "k", k), Value: strconv.Itoa(k), Default: k == current}
+		if k == api.MinAnonymityThreshold {
+			o.Description = l.T("setup.min_people_small")
+		}
+		out = append(out, o)
+	}
+	return out
 }

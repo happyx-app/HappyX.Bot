@@ -277,7 +277,7 @@ func TestSurveyOffersOptions(t *testing.T) {
 func TestOptions(t *testing.T) {
 	es := i18n.Get("es")
 	g := api.Guild{DiscordID: "100000000000000001", Name: "Equipo", Anonymous: true, Timezone: "Europe/Madrid", SurveyHour: 13, WorkingDays: presetDays("mon_fri")}
-	b := &Bot{webURL: "https://happyx.example.com"}
+	b := &Bot{webURL: "https://happyx.example.com", now: func() time.Time { return time.Date(2026, 10, 23, 12, 0, 0, 0, time.UTC) }}
 	o := b.optionsMessage(es, g, "2026-10-23", "500000000000000001")
 	if o.Flags&discordgo.MessageFlagsEphemeral == 0 {
 		t.Fatal("the options are only for whoever pressed the button")
@@ -551,5 +551,123 @@ func TestPausedStatusLeavesOutTheSchedule(t *testing.T) {
 	got := b.statusMessage(es, g, es.T("status.you_paused"), "", "", true, false, 3).Content
 	if !strings.HasPrefix(got, "**Equipo** · Tienes la encuesta pausada.\n") {
 		t.Fatalf("paused status: %q", got)
+	}
+}
+
+func TestSurveySaysWhenNamesStart(t *testing.T) {
+	es := i18n.Get("es")
+	g := api.Guild{Anonymous: true}
+	if got := surveyPrivacy(es, g, "2026-11-16"); got != "🔒 Respuesta anónima" {
+		t.Fatalf("anonymous: %q", got)
+	}
+	// Turned off on Monday: Monday's survey is still anonymous and says from when it won't be.
+	g = api.Guild{Anonymous: false, NamedSince: "2026-11-17"}
+	if got := surveyPrivacy(es, g, "2026-11-16"); got != "🔒 Respuesta anónima · Con nombre desde el 17 nov" {
+		t.Fatalf("the day it was turned off: %q", got)
+	}
+	if !g.AnonymousOn("2026-11-16") || g.AnonymousOn("2026-11-17") {
+		t.Fatal("names start on NamedSince")
+	}
+	if got := surveyPrivacy(es, g, "2026-11-17"); got != "👁 Con nombre desde el 17 nov: el admin ve quién responde" {
+		t.Fatalf("the first named day: %q", got)
+	}
+	if got := surveyPrivacy(es, g, "2026-11-24"); got != "👁 El admin ve quién responde" {
+		t.Fatalf("a week later: %q", got)
+	}
+	label := noteModal(es, g, surveyID{Action: actionNote, GuildID: "1", Day: "2026-11-16", Mood: 3}).Components[0].(discordgo.ActionsRow).Components[0].(discordgo.TextInput).Label
+	if label != "Lo leen los admins, sin tu nombre" {
+		t.Fatalf("comment on the last anonymous day: %q", label)
+	}
+}
+
+func TestWithheldReport(t *testing.T) {
+	es := i18n.Get("es")
+	g := api.Guild{Name: "Equipo"}
+	r := api.Report{From: "2026-11-09", To: "2026-11-13", Anonymous: true, Withheld: true, AnonymityThreshold: 3, Responses: 4, Respondents: 2,
+		Days: []api.ReportDay{{Day: "2026-11-09", Responses: 2, Withheld: true}}}
+	m := reportMessage(es, g, r)
+	if len(m.Files) != 0 || m.Embeds[0].Image != nil {
+		t.Fatal("a withheld report has no image")
+	}
+	want := "**Personas que respondieron:** 2\nNingún día llegó al mínimo de 3 personas. Para que nadie pueda saber quién ha dicho qué, no se muestran medias ni comentarios."
+	if d := m.Embeds[0].Description; d != want {
+		t.Fatalf("withheld report: %q", d)
+	}
+}
+
+func TestAnonymousCommentsHaveNoDayOrMood(t *testing.T) {
+	es := i18n.Get("es")
+	got := comments(es, []api.ReportMsg{
+		{Message: "Muchas reuniones"},
+		{Day: "2026-11-10", Mood: 4, Message: "Bien", Username: "ana", DiscordID: "1"},
+	})
+	if !strings.Contains(got, "> Muchas reuniones\n") || strings.Contains(got, "> 🙂 Muchas") {
+		t.Fatalf("anonymous comment: %q", got)
+	}
+	if !strings.Contains(got, "\n> 🙂 Bien\n-# ma 10 nov · ana") {
+		t.Fatalf("named comment: %q", got)
+	}
+}
+
+func TestMinPeopleOptions(t *testing.T) {
+	es := i18n.Get("es")
+	opts := minPeopleOptions(es, 3)
+	if opts[0].Label != "Resultados con al menos 3 personas al día" || !opts[0].Default || opts[0].Description != "Para equipos pequeños" {
+		t.Fatalf("first option: %+v", opts[0])
+	}
+	if opts := minPeopleOptions(es, 7); len(opts) != 7 || opts[4].Value != "7" || !opts[4].Default {
+		t.Fatalf("a threshold set elsewhere is offered: %+v", opts)
+	}
+	p, _, save, ok := setupPatch(setupID{Action: setupMinPeople, Page: "1"}, []string{"5"})
+	if !ok || !save || p.AnonymityThreshold == nil || *p.AnonymityThreshold != 5 {
+		t.Fatalf("choosing 5: %+v %v %v", p, save, ok)
+	}
+	if _, _, _, ok := setupPatch(setupID{Action: setupMinPeople, Page: "1"}, []string{"2"}); ok {
+		t.Fatal("2 is below the minimum")
+	}
+}
+
+// Withheld days count only in the answers: the bars are out of the answers the API counted.
+func TestTextSummaryLeavesWithheldDaysOut(t *testing.T) {
+	es := i18n.Get("es")
+	r := api.Report{Responses: 5, Respondents: 3, Average: 4, Distribution: map[string]int{"4": 2, "5": 2}}
+	if r.Counted() != 4 {
+		t.Fatalf("counted = %d, want 4", r.Counted())
+	}
+	if got := textSummary(es, r); !strings.Contains(got, "🙂 "+bar(2, 4)+" 2") {
+		t.Fatalf("bars should be out of the counted answers: %q", got)
+	}
+}
+
+func TestReportNamesWithheldDays(t *testing.T) {
+	es := i18n.Get("es")
+	r := api.Report{Responses: 10, Respondents: 4, Average: 4, AnonymityThreshold: 3, Distribution: map[string]int{"4": 8},
+		Days: []api.ReportDay{{Day: "2026-10-19", Responses: 8, Average: 4}, {Day: "2026-10-20", Responses: 2, Withheld: true}}}
+	if got := summary(es, r); !strings.HasSuffix(got, "\n-# Sin contar ma 20 oct en la media, la distribución ni los comentarios: respondieron menos de 3 personas.") {
+		t.Fatalf("summary: %q", got)
+	}
+	// After lowering the threshold, a day judged by the old one says so.
+	r.Days = append(r.Days, api.ReportDay{Day: "2026-10-21", Responses: 4, Withheld: true, AnonymityThreshold: 5})
+	r.Days[1].AnonymityThreshold = 3
+	if got := withheldDays(es, r); got != "\n-# Sin contar ma 20 oct en la media, la distribución ni los comentarios: respondieron menos de 3 personas.\n-# Sin contar mi 21 oct en la media, la distribución ni los comentarios: respondieron menos de 5 personas." {
+		t.Fatalf("withheld days: %q", got)
+	}
+}
+
+// Only lowering the minimum says that days already answered keep the old one.
+func TestConfigSavedMinPeople(t *testing.T) {
+	es := i18n.Get("es")
+	note := es.T("config.min_people_lower")
+	g := api.Guild{AnonymityThreshold: 3, SurveyHour: 13, ReportFrequency: "weekly", Language: "es"}
+	k := 3
+	if got := configSaved(es, g, api.GuildPatch{AnonymityThreshold: &k}, 5); !strings.Contains(got, note) {
+		t.Fatalf("lowering 5 → 3 should say it: %q", got)
+	}
+	g.AnonymityThreshold, k = 5, 5
+	if got := configSaved(es, g, api.GuildPatch{AnonymityThreshold: &k}, 3); strings.Contains(got, note) {
+		t.Fatalf("raising 3 → 5 shouldn't: %q", got)
+	}
+	if got := configSaved(es, g, api.GuildPatch{AnonymityThreshold: &k}, 0); strings.Contains(got, note) {
+		t.Fatalf("an unknown previous minimum shouldn't: %q", got)
 	}
 }

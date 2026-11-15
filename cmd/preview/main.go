@@ -140,10 +140,14 @@ func writeComponents(b *strings.Builder, components []discordgo.MessageComponent
 			fmt.Fprintf(b, "<div class=\"content\">%s</div>", markdown(c.Content))
 		case discordgo.Separator:
 			b.WriteString("<hr>")
+		case *discordgo.ActionsRow: // as Discord sends a card back, which the bot rebuilds from
+			writeComponents(b, []discordgo.MessageComponent{*c})
 		case discordgo.ActionsRow:
 			b.WriteString(`<div class="row">`)
 			for _, rc := range c.Components {
 				switch rc := rc.(type) {
+				case *discordgo.Button:
+					writeButton(b, *rc)
 				case discordgo.Button:
 					writeButton(b, rc)
 				case discordgo.SelectMenu:
@@ -189,6 +193,7 @@ var (
 	reChannel = regexp.MustCompile(`&lt;#(\d+)&gt;`)
 	reCommand = regexp.MustCompile(`&lt;/([^:&]+):\d+&gt;`)
 	reDate    = regexp.MustCompile(`&lt;t:(\d+):D&gt;`)
+	reFull    = regexp.MustCompile(`&lt;t:(\d+):F&gt;`)
 	reBold    = regexp.MustCompile(`\*\*(.+?)\*\*`)
 	reCode    = regexp.MustCompile("`([^`]+)`")
 )
@@ -248,6 +253,14 @@ func inline(s string) string {
 		sec, _ := strconv.ParseInt(reDate.FindStringSubmatch(m)[1], 10, 64)
 		t := time.Unix(sec, 0).UTC()
 		return fmt.Sprintf("%d %s %d", t.Day(), loc.List("date.months_long")[t.Month()-1], t.Year())
+	})
+	// The full date and time, as a reader in Madrid sees it.
+	s = reFull.ReplaceAllStringFunc(s, func(m string) string {
+		sec, _ := strconv.ParseInt(reFull.FindStringSubmatch(m)[1], 10, 64)
+		madrid, _ := time.LoadLocation("Europe/Madrid")
+		t := time.Unix(sec, 0).In(madrid)
+		day := loc.T("date.long", "weekday", loc.List("date.weekdays_long")[t.Weekday()], "day", t.Day(), "month", loc.List("date.months_long")[t.Month()-1])
+		return fmt.Sprintf("%s %d %s", day, t.Year(), t.Format("15:04"))
 	})
 	s = reBold.ReplaceAllString(s, "<b>$1</b>")
 	return reCode.ReplaceAllString(s, "<code>$1</code>")

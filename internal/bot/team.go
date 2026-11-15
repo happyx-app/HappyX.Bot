@@ -602,6 +602,19 @@ func teamChannelLine(l *i18n.Locale, g api.Guild) string {
 	return line
 }
 
+// closedDMsWarning tells admins that people with DMs closed didn't get the last survey and, with
+// no team channel, have nowhere else to answer it.
+func (b *Bot) closedDMsWarning(l *i18n.Locale, g api.Guild, closed int) string {
+	if closed == 0 || g.TeamChannel() != "" {
+		return ""
+	}
+	key := "team.closed_dms"
+	if closed == 1 {
+		key = "team.closed_dms_one"
+	}
+	return "\n" + l.T(key, "count", closed, "config_cmd", b.mention(cmdConfig))
+}
+
 // teamChannelWarning says HappyX can't post in the team channel, where the Monday summary and the
 // notes would fail; empty when it can or there is none.
 func (b *Bot) teamChannelWarning(l *i18n.Locale, g api.Guild) string {

@@ -55,10 +55,19 @@ report. One bot serves any number of servers; their data is kept apart by
   answering, the card shows their mood, and they can add a comment (the form says who reads it) or
   change the mood, which keeps the comment. A survey can be answered until the next one arrives:
   then it turns into a grey card with just its day, and the answered ones lose their buttons, so
-  only today's is open in the DM (the API also refuses days before yesterday).
+  only today's is open in the DM (the API also refuses days before yesterday). Answered after
+  midnight, yesterday's survey asks about yesterday. On the week's last survey day the answer card
+  also shows **Your week**, the member's own face for each survey day (a dash where they didn't
+  answer), with a link to **My evolution**; nobody else sees it.
   **Options** under the survey shows, only to that member, when it comes and what admins see of
   the answers, with **Vacation** (a form, for every server), **Pause** (asks first; the card then
-  offers **Get it again**) and **My evolution** on the web.
+  offers **Get it again**) and **My evolution** on the web. Pausing or resuming from anywhere else
+  (`/happyx status`, `pause`, `resume`, in a server or in the DM) changes that day's card the same way.
+- **Without DMs**: when a survey DM fails because someone has DMs from the server closed, the bot
+  posts one message in the team channel with **Answer today**, and keeps it (it posts it again only
+  if it is gone or the team channel changed). The button opens the open survey, or the answer
+  already given, as a message only that person sees, so answering stays private. It never shows
+  who answered or how many.
   On vacation (`/happyx vacation`, or the web) nobody gets the survey or the game. An admin can set
   a member's vacation on the web if they forgot; the bot then tells them by DM, with a link to
   remove it.
@@ -77,11 +86,13 @@ report. One bot serves any number of servers; their data is kept apart by
   since they are public anyway.
 - **«Who's who?» game** (off by default, `/happyx config games:True` or the web settings): on
   Monday, from the survey hour, every member taking part gets an icebreaker question by DM and
-  answers it in a modal until Wednesday (they can also answer on the web). On Thursday they get a
-  link to guess on the web who wrote each answer, if at least 3 answered; on Monday the web shows
-  who was who and the ranking. The DM tells members their name comes out at the end of the week.
-  The Thursday DM also has a **Propose a question** button (sent on its own when there weren't
-  enough answers to guess): until Sunday each member can propose next week's question, and on
+  answers it in a modal until Wednesday (they can also answer on the web). On Thursday the link to
+  guess on the web who wrote each answer (if at least 3 answered) comes as one more line and button
+  on that day's survey, and stays there after answering and when the next survey closes it; whoever
+  plays without getting the survey, or a server whose Thursday isn't a survey day, gets it as a DM
+  of its own. On Monday the web shows who was who and the ranking. The DM tells members their name
+  comes out at the end of the week. When there weren't enough answers to guess, the line asks for
+  next week's question with **Propose a question** instead: until Sunday each member can propose next week's question, and on
   Monday the API draws one of them. With no proposals, questions rotate weekly from `game.q.*` in
   the locales. Turned on mid-week, the game starts that same week until Wednesday.
 - The API records each survey and report it has sent, so restarts never send twice. A send
@@ -96,7 +107,7 @@ report. One bot serves any number of servers; their data is kept apart by
 | Command | Who | What |
 | --- | --- | --- |
 | `/happyx status` | everyone | whether you receive the survey, what admins see, your vacations, with the same buttons as the survey's **Options**; whoever can see the reports also gets the server's settings |
-| `/happyx pause` / `/happyx resume` | everyone | stop / resume receiving the survey in this server; resume also ends a vacation |
+| `/happyx pause` / `/happyx resume` | everyone | stop / resume receiving the survey in this server; resume also ends a vacation going on today, and says so |
 | `/happyx vacation from to` | everyone | no survey or game from the first day to the last, in every server (dates day first: `20/12`, `20/12/2026` or `2026-12-20`; at most 90 days). Those days don't count against participation or the streak |
 | `/happyx kudos` | everyone | `user`, `message` (≤300): publicly thank a teammate |
 | Apps › **Give kudos** | everyone | right-click a user or a message: the same kudos, text written in a form |
@@ -144,7 +155,12 @@ code and sample data. No Discord server or API needed.
    command, which needs no permissions. The server's owner becomes its HappyX admin; change it
    with `/happyx config admin` or on the dashboard.
 
-Members need "Allow direct messages from server members" enabled (Discord's default) to receive the survey.
+Members need "Allow direct messages from server members" enabled (Discord's default) to receive the
+survey by DM; whoever has it off answers from **Answer today** in the team channel.
+
+`/happyx status`, `pause`, `resume` and `vacation` also work in the DM with the bot: in several
+servers with HappyX, it asks which one. The other commands are about a server and say to use them
+there.
 
 ## Configuration
 

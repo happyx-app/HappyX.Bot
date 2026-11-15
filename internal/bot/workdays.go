@@ -76,3 +76,40 @@ func workingDaysText(l *i18n.Locale, iso []int) string {
 	}
 	return strings.Join(parts, ", ")
 }
+
+// workingWeek is the survey days of the week day falls in, in order. A week starts on Monday,
+// or earlier when the working days run over the weekend into Monday (Sunday to Thursday starts
+// on Sunday), as workingDaysText writes them.
+func workingWeek(iso []int, day time.Time) []time.Time {
+	if len(iso) == 0 {
+		iso = presetDays("mon_fri")
+	}
+	var on [7]bool // index 0 is Monday
+	n := 0
+	for _, d := range iso {
+		if d >= 1 && d <= 7 && !on[d-1] {
+			on[d-1] = true
+			n++
+		}
+	}
+	start := 0
+	for n > 0 && n < 7 && on[0] && on[(start+6)%7] {
+		start = (start + 6) % 7
+	}
+	idx := (int(day.Weekday()) + 6) % 7 // 0 is Monday
+	first := day.AddDate(0, 0, -((idx - start + 7) % 7))
+	var out []time.Time
+	for i := 0; i < 7; i++ {
+		d := first.AddDate(0, 0, i)
+		if on[(int(d.Weekday())+6)%7] {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
+// lastWorkingDay reports whether day is the last survey day of its week.
+func lastWorkingDay(iso []int, day time.Time) bool {
+	w := workingWeek(iso, day)
+	return len(w) > 0 && w[len(w)-1].Equal(day)
+}

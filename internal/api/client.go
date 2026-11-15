@@ -392,9 +392,19 @@ func (c *Client) Members(ctx context.Context, guildID string) ([]Member, error) 
 }
 
 // SurveyRecipients is Members without those the server's survey roles leave out of the daily
-// survey. withStreak adds each member's answering streak, for {{user.streak}}.
+// survey, nor those on vacation today. withStreak adds each member's answering streak, for
+// {{user.streak}}.
 func (c *Client) SurveyRecipients(ctx context.Context, guildID string, withStreak bool) ([]Member, error) {
+	return c.SurveyRecipientsOn(ctx, guildID, "", withStreak)
+}
+
+// SurveyRecipientsOn is SurveyRecipients with the vacations of day (YYYY-MM-DD; "" for today):
+// who got that day's survey.
+func (c *Client) SurveyRecipientsOn(ctx context.Context, guildID, day string, withStreak bool) ([]Member, error) {
 	path := "/v1/guilds/" + url.PathEscape(guildID) + "/members?for=survey"
+	if day != "" {
+		path += "&day=" + url.QueryEscape(day)
+	}
 	if withStreak {
 		path += "&with=streak"
 	}
@@ -463,9 +473,31 @@ func (c *Client) ClaimDispatch(ctx context.Context, guildID, kind, period string
 }
 
 // FinishDispatch tells the API how many people a claimed send went to and how many DMs failed.
-func (c *Client) FinishDispatch(ctx context.Context, guildID, kind, period string, recipients, failed int) error {
+func (c *Client) FinishDispatch(ctx context.Context, guildID, kind, period string, recipients, failed, closedDMs int) error {
 	return c.do(ctx, http.MethodPut, "/v1/guilds/"+url.PathEscape(guildID)+"/dispatches/"+url.PathEscape(kind)+"/"+url.PathEscape(period),
-		map[string]int{"recipients": recipients, "failed": failed}, nil)
+		map[string]int{"recipients": recipients, "failed": failed, "closed_dms": closedDMs}, nil)
+}
+
+// Health is who the survey reaches now and how the last one went.
+type Health struct {
+	Audience   int         `json:"audience"`
+	LastSurvey *LastSurvey `json:"last_survey"`
+}
+
+// LastSurvey is the latest survey sent: how many DMs failed and, of those, how many because the
+// person has DMs closed.
+type LastSurvey struct {
+	Day        string `json:"day"`
+	Recipients int    `json:"recipients"`
+	Failed     int    `json:"failed"`
+	ClosedDMs  int    `json:"closed_dms"`
+}
+
+// Health is what /happyx status tells admins about who the survey reaches.
+func (c *Client) Health(ctx context.Context, guildID string) (Health, error) {
+	var h Health
+	err := c.do(ctx, http.MethodGet, "/v1/guilds/"+url.PathEscape(guildID)+"/health", nil, &h)
+	return h, err
 }
 
 // DispatchSent reports whether the period was already claimed for sending. An older API without
@@ -674,9 +706,13 @@ func (c *Client) SetVacation(ctx context.Context, guildID, userID, from, to stri
 	return v, err
 }
 
-// EndVacations ends the member's own vacation and the one an admin set for them in the server.
-func (c *Client) EndVacations(ctx context.Context, guildID, userID string) error {
-	return c.do(ctx, http.MethodDelete, memberPath(guildID, userID)+"/vacations", nil, nil)
+// EndVacations is /happyx resume: the member's vacations that cover today in the server, their
+// own and the one an admin set for them there, end yesterday. Later ones stay. It returns the
+// ones it ended, as they were.
+func (c *Client) EndVacations(ctx context.Context, guildID, userID string) ([]Vacation, error) {
+	var vs []Vacation
+	err := c.do(ctx, http.MethodDelete, memberPath(guildID, userID)+"/vacations", nil, &vs)
+	return vs, err
 }
 
 // VacationNotice is a vacation an admin set on the dashboard, which the bot tells the member about.
@@ -698,4 +734,56 @@ func (c *Client) VacationNotices(ctx context.Context) ([]VacationNotice, error) 
 // DoneVacationNotice tells the API the member was told, or can't be (DMs closed).
 func (c *Client) DoneVacationNotice(ctx context.Context, id int64) error {
 	return c.do(ctx, http.MethodDelete, "/v1/vacation-notices/"+strconv.FormatInt(id, 10), nil, nil)
+}
+
+// MemberMoods is the member's own answers in the guild from from to to (YYYY-MM-DD, at most 31
+// days), oldest first, to show only to them.
+func (c *Client) MemberMoods(ctx context.Context, guildID, userID, from, to string) ([]MoodEntry, error) {
+	var out []MoodEntry
+	err := c.do(ctx, http.MethodGet, memberPath(guildID, userID)+"/moods?"+url.Values{"from": {from}, "to": {to}}.Encode(), nil, &out)
+	return out, err
+}
+
+// UserGuild is a server the user is in, and whether they paused its survey.
+type UserGuild struct {
+	Guild
+	Paused bool `json:"paused"`
+}
+
+// UserGuilds is the active servers the user is in, whether or not they get the survey there.
+func (c *Client) UserGuilds(ctx context.Context, userID string) ([]UserGuild, error) {
+	var out []UserGuild
+	err := c.do(ctx, http.MethodGet, "/v1/users/"+url.PathEscape(userID)+"/guilds", nil, &out)
+	return out, err
+}
+
+// ChannelPost is where the bot keeps one of its messages in a channel.
+type ChannelPost struct {
+	Kind      string `json:"kind"`
+	ChannelID string `json:"channel_id"`
+	MessageID string `json:"message_id"`
+}
+
+// PostSurvey is the kind of the daily survey's message for whoever doesn't get HappyX's DMs.
+const PostSurvey = "survey"
+
+// ChannelPost fails with ErrNotFound when the guild has no post of that kind.
+func (c *Client) ChannelPost(ctx context.Context, guildID, kind string) (ChannelPost, error) {
+	var out ChannelPost
+	err := c.do(ctx, http.MethodGet, channelPostPath(guildID, kind), nil, &out)
+	return out, err
+}
+
+// PutChannelPost records where the bot has just published the guild's post of that kind.
+func (c *Client) PutChannelPost(ctx context.Context, guildID, kind, channelID, messageID string) error {
+	return c.do(ctx, http.MethodPut, channelPostPath(guildID, kind), map[string]string{"channel_id": channelID, "message_id": messageID}, nil)
+}
+
+// DeleteChannelPost forgets the guild's post of that kind.
+func (c *Client) DeleteChannelPost(ctx context.Context, guildID, kind string) error {
+	return c.do(ctx, http.MethodDelete, channelPostPath(guildID, kind), nil, nil)
+}
+
+func channelPostPath(guildID, kind string) string {
+	return "/v1/guilds/" + url.PathEscape(guildID) + "/channel-posts/" + url.PathEscape(kind)
 }

@@ -589,7 +589,7 @@ func TestWithheldReport(t *testing.T) {
 	if len(m.Files) != 0 || m.Embeds[0].Image != nil {
 		t.Fatal("a withheld report has no image")
 	}
-	want := "**Personas que respondieron:** 2\nNingún día han respondido 3 personas o más. Para que nadie pueda saber quién ha dicho qué, no se muestran medias ni comentarios."
+	want := "**Personas que respondieron:** 2\nNingún día llegó al mínimo de 3 personas. Para que nadie pueda saber quién ha dicho qué, no se muestran medias ni comentarios."
 	if d := m.Embeds[0].Description; d != want {
 		t.Fatalf("withheld report: %q", d)
 	}
@@ -643,13 +643,13 @@ func TestReportNamesWithheldDays(t *testing.T) {
 	es := i18n.Get("es")
 	r := api.Report{Responses: 10, Respondents: 4, Average: 4, AnonymityThreshold: 3, Distribution: map[string]int{"4": 8},
 		Days: []api.ReportDay{{Day: "2026-10-19", Responses: 8, Average: 4}, {Day: "2026-10-20", Responses: 2, Withheld: true}}}
-	if got := summary(es, r); !strings.HasSuffix(got, "\n-# La media y los comentarios no cuentan ma 20 oct: respondieron menos de 3 personas.") {
+	if got := summary(es, r); !strings.HasSuffix(got, "\n-# Sin contar ma 20 oct en la media, la distribución ni los comentarios: respondieron menos de 3 personas.") {
 		t.Fatalf("summary: %q", got)
 	}
 	// After lowering the threshold, a day judged by the old one says so.
 	r.Days = append(r.Days, api.ReportDay{Day: "2026-10-21", Responses: 4, Withheld: true, AnonymityThreshold: 5})
 	r.Days[1].AnonymityThreshold = 3
-	if got := withheldDays(es, r); got != "\n-# La media y los comentarios no cuentan ma 20 oct: respondieron menos de 3 personas.\n-# La media y los comentarios no cuentan mi 21 oct: respondieron menos de 5 personas." {
+	if got := withheldDays(es, r); got != "\n-# Sin contar ma 20 oct en la media, la distribución ni los comentarios: respondieron menos de 3 personas.\n-# Sin contar mi 21 oct en la media, la distribución ni los comentarios: respondieron menos de 5 personas." {
 		t.Fatalf("withheld days: %q", got)
 	}
 }

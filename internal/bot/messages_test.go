@@ -589,7 +589,7 @@ func TestWithheldReport(t *testing.T) {
 	if len(m.Files) != 0 || m.Embeds[0].Image != nil {
 		t.Fatal("a withheld report has no image")
 	}
-	want := "**Personas que han respondido:** 2\nNingún día han respondido 3 personas o más. Para que nadie pueda saber quién ha dicho qué, no se muestran medias ni comentarios."
+	want := "**Personas que respondieron:** 2\nNingún día han respondido 3 personas o más. Para que nadie pueda saber quién ha dicho qué, no se muestran medias ni comentarios."
 	if d := m.Embeds[0].Description; d != want {
 		t.Fatalf("withheld report: %q", d)
 	}
@@ -612,7 +612,7 @@ func TestAnonymousCommentsHaveNoDayOrMood(t *testing.T) {
 func TestMinPeopleOptions(t *testing.T) {
 	es := i18n.Get("es")
 	opts := minPeopleOptions(es, 3)
-	if opts[0].Label != "Resultados con al menos 3 personas" || !opts[0].Default || opts[0].Description != "Para equipos pequeños" {
+	if opts[0].Label != "Resultados con al menos 3 personas al día" || !opts[0].Default || opts[0].Description != "Para equipos pequeños" {
 		t.Fatalf("first option: %+v", opts[0])
 	}
 	if opts := minPeopleOptions(es, 7); len(opts) != 7 || opts[4].Value != "7" || !opts[4].Default {
@@ -636,5 +636,14 @@ func TestTextSummaryLeavesWithheldDaysOut(t *testing.T) {
 	}
 	if got := textSummary(es, r); !strings.Contains(got, "🙂 "+bar(2, 4)+" 2") {
 		t.Fatalf("bars should be out of the counted answers: %q", got)
+	}
+}
+
+func TestReportNamesWithheldDays(t *testing.T) {
+	es := i18n.Get("es")
+	r := api.Report{Responses: 10, Respondents: 4, Average: 4, AnonymityThreshold: 3, Distribution: map[string]int{"4": 8},
+		Days: []api.ReportDay{{Day: "2026-10-19", Responses: 8, Average: 4}, {Day: "2026-10-20", Responses: 2, Withheld: true}}}
+	if got := summary(es, r); !strings.HasSuffix(got, "\n-# Sin contar ma 20 oct: respondieron menos de 3 personas.") {
+		t.Fatalf("summary: %q", got)
 	}
 }

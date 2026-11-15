@@ -48,8 +48,8 @@ func Previews(code string) []Preview {
 	public.Anonymous, public.NamedSince = false, "2026-10-24" // turned off today: names from tomorrow
 	five, fivePeople := 5, g
 	fivePeople.AnonymityThreshold = 5
-	namedNow := public
-	namedNow.NamedSince = day
+	// The Monday after: names started on Saturday 24, as the survey above announced.
+	namedDay := "2026-10-26"
 	sunToThu := g
 	sunToThu.WorkingDays = presetDays("sun_thu")
 	ana := surveyRecipient{ID: PreviewAnaID, Name: "Ana", Streak: 5}
@@ -80,7 +80,7 @@ func Previews(code string) []Preview {
 	return append([]Preview{
 		{Title: "Daily survey", Channel: "DM", Msg: surveyMessage(l, g, day, ana, PreviewGuildIcon)},
 		{Title: "Daily survey the day anonymity is turned off (names from tomorrow)", Channel: "DM", Msg: surveyMessage(l, public, day, ana, PreviewGuildIcon)},
-		{Title: "Daily survey the first week with names", Channel: "DM", Msg: surveyMessage(l, namedNow, day, ana, PreviewGuildIcon)},
+		{Title: "Daily survey the first week with names", Channel: "DM", Msg: surveyMessage(l, public, namedDay, ana, PreviewGuildIcon)},
 		{Title: "Daily survey with the admin's own message", Channel: "DM", Msg: surveyMessage(l, custom, day, ana, PreviewGuildIcon)},
 		{Title: "Daily survey until the first answer since the privacy policy's date", Channel: "DM", Msg: surveyMessage(l, g, day, anaFirst, PreviewGuildIcon)},
 		{Title: "Options (from the survey)", Channel: "DM", Ephemeral: true, Msg: data(b.optionsMessage(l, g, day, "1"))},

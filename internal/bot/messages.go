@@ -300,7 +300,22 @@ func summary(l *i18n.Locale, r api.Report) string {
 	return l.T("report.summary",
 		"average", l.T("report.average"), "value", l.Decimal(r.Average), "emoji", moodEmoji(int(r.Average+0.5)),
 		"responses", l.T("report.responses"), "count", r.Responses,
-		"people", l.T("report.people"), "people_count", r.Respondents)
+		"people", l.T("report.people"), "people_count", r.Respondents) + withheldDays(l, r)
+}
+
+// withheldDays names the days with too few people, which count only in the answers: «Sin contar
+// ma 20 oct: respondieron menos de 3 personas.» Empty when there are none.
+func withheldDays(l *i18n.Locale, r api.Report) string {
+	var days []string
+	for _, d := range r.Days {
+		if d.Withheld {
+			days = append(days, dayLabel(l, d.Day))
+		}
+	}
+	if len(days) == 0 {
+		return ""
+	}
+	return "\n-# " + l.T("report.withheld_days", "days", strings.Join(days, ", "), "k", max(r.AnonymityThreshold, api.MinAnonymityThreshold))
 }
 
 // comments lists the comments as quotes, stopping at the budget with a count of the rest. An
@@ -395,7 +410,7 @@ func textSummary(l *i18n.Locale, r api.Report) string {
 	b.WriteString(l.T("report.summary",
 		"average", l.T("report.average"), "value", l.Decimal(r.Average), "emoji", moodEmoji(int(r.Average+0.5)),
 		"responses", l.T("report.responses"), "count", r.Responses,
-		"people", l.T("report.people"), "people_count", r.Respondents))
+		"people", l.T("report.people"), "people_count", r.Respondents) + withheldDays(l, r))
 	b.WriteString("\n\n")
 	for i := len(moodEmojis); i >= 1; i-- {
 		n := r.Distribution[fmt.Sprint(i)]

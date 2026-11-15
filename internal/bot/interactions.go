@@ -528,6 +528,14 @@ func (b *Bot) cmdConfig(ctx context.Context, i *discordgo.InteractionCreate, l *
 			p.SurveyEnabled = &v
 		}
 	}
+	// The minimum before the change, to say when lowering it leaves the days already answered as
+	// they were. Without it the confirmation just leaves that line out.
+	before := 0
+	if p.AnonymityThreshold != nil {
+		if old, err := b.api.Guild(ctx, i.GuildID); err == nil {
+			before = old.Threshold()
+		}
+	}
 	g, err := b.api.UpdateGuild(ctx, i.GuildID, p)
 	if err != nil {
 		b.replyError(i, l, err)
@@ -536,7 +544,7 @@ func (b *Bot) cmdConfig(ctx context.Context, i *discordgo.InteractionCreate, l *
 	if p.Language != nil {
 		l = i18n.Get(g.Language) // confirm in the language just chosen
 	}
-	s := configSaved(l, g, p)
+	s := configSaved(l, g, p, before)
 	if p.SurveyEnabled != nil {
 		s += "\n" + b.surveyNotice(ctx, l, g, true)
 	} else if line := b.surveyOffLine(l, g); line != "" {
@@ -546,8 +554,9 @@ func (b *Bot) cmdConfig(ctx context.Context, i *discordgo.InteractionCreate, l *
 }
 
 // configSaved confirms the new settings. When the change turned anonymity off, it adds from
-// which day names apply and that earlier answers stay anonymous.
-func configSaved(l *i18n.Locale, g api.Guild, p api.GuildPatch) string {
+// which day names apply and that earlier answers stay anonymous. before is the minimum of people
+// before the change (0 when unknown): lowering it says that days already answered keep the old one.
+func configSaved(l *i18n.Locale, g api.Guild, p api.GuildPatch, before int) string {
 	s := l.T("config.saved",
 		"days", workingDaysText(l, g.WorkingDays), "hour", fmt.Sprintf("%02d", g.SurveyHour), "timezone", g.Timezone,
 		"frequency", l.T("freq."+g.ReportFrequency), "admin", "<@"+g.AdminDiscordID+">",
@@ -557,6 +566,9 @@ func configSaved(l *i18n.Locale, g api.Guild, p api.GuildPatch) string {
 	}
 	if p.AnonymityThreshold != nil {
 		s += "\n" + l.T("config.min_people", "k", g.Threshold())
+		if g.Threshold() < before {
+			s += " " + l.T("config.min_people_lower")
+		}
 	}
 	if p.GamesEnabled != nil && *p.GamesEnabled {
 		s += "\n" + l.T("config.games_on")

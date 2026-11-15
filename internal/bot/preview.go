@@ -48,6 +48,8 @@ func Previews(code string) []Preview {
 	public.Anonymous, public.NamedSince = false, "2026-10-24" // turned off today: names from tomorrow
 	five, fivePeople := 5, g
 	fivePeople.AnonymityThreshold = 5
+	three, threePeople := 3, g
+	threePeople.AnonymityThreshold = 3
 	// The Monday after: names started on Saturday 24, as the survey above announced.
 	namedDay := "2026-10-26"
 	sunToThu := g
@@ -112,9 +114,9 @@ func Previews(code string) []Preview {
 		{Title: "Status (an admin)", Channel: "#general", Command: "/happyx status", Ephemeral: true,
 			Msg: data(b.statusMessage(l, g, l.T("status.you_receiving"), "", "", false, true, 12))},
 		{Title: "Changing the working days", Channel: "#general", Command: "/happyx config working_days:" + l.T("days.sun_thu"), Ephemeral: true,
-			Msg: text(configSaved(l, sunToThu, api.GuildPatch{WorkingDays: sunToThu.WorkingDays}))},
+			Msg: text(configSaved(l, sunToThu, api.GuildPatch{WorkingDays: sunToThu.WorkingDays}, 0))},
 		{Title: "Turning anonymity off", Channel: "#general", Command: "/happyx config anonymous:False", Ephemeral: true,
-			Msg: text(configSaved(l, public, api.GuildPatch{Anonymous: &no}))},
+			Msg: text(configSaved(l, public, api.GuildPatch{Anonymous: &no}, 0))},
 		{Title: "Pause", Channel: "#general", Command: "/happyx pause", Ephemeral: true, Msg: text(l.T("pause.done", "resume_cmd", b.resumeMention()))},
 		{Title: "Vacation", Channel: "#general", Command: "/happyx vacation from:20/12 to:6/1", Ephemeral: true,
 			Msg: text(l.T("vacation.done", "from", discordDate("2026-12-20"), "to", discordDate("2027-01-06"), "resume_cmd", b.resumeMention()))},
@@ -126,9 +128,11 @@ func Previews(code string) []Preview {
 		{Title: "Weekly report with a day below the threshold", Channel: "DM", Msg: reportMessage(l, g, previewPartlyWithheld())},
 		{Title: "Weekly report when no day reached the threshold", Channel: "DM", Msg: reportMessage(l, g, previewWithheld())},
 		{Title: "Setting the fewest people", Channel: "#general", Command: "/happyx config min_people:5", Ephemeral: true,
-			Msg: text(configSaved(l, fivePeople, api.GuildPatch{AnonymityThreshold: &five}))},
+			Msg: text(configSaved(l, fivePeople, api.GuildPatch{AnonymityThreshold: &five}, 3))},
+		{Title: "Lowering the fewest people", Channel: "#general", Command: "/happyx config min_people:3", Ephemeral: true,
+			Msg: text(configSaved(l, threePeople, api.GuildPatch{AnonymityThreshold: &three}, 5))},
 		{Title: "Turning the game on", Channel: "#general", Command: "/happyx config games:True", Ephemeral: true,
-			Msg: text(configSaved(l, games, api.GuildPatch{GamesEnabled: &yes}))},
+			Msg: text(configSaved(l, games, api.GuildPatch{GamesEnabled: &yes}, 0))},
 		{Title: "«Who's who?» question (Monday)", Channel: "DM", Msg: gameQuestionMessage(l, g, api.GameRound{Week: week, Question: question}, gameLink)},
 		{Title: "A question the team proposed (Monday)", Channel: "DM", Msg: gameQuestionMessage(l, g, api.GameRound{Week: week, Question: question, Proposed: true}, gameLink)},
 		{Title: "After answering the game", Channel: "DM", Msg: data(gameAnsweredMessage(l, g, question, week, "Astronauta, y luego bombera 🚒", gameLink))},

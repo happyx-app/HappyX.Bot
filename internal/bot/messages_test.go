@@ -653,3 +653,21 @@ func TestReportNamesWithheldDays(t *testing.T) {
 		t.Fatalf("withheld days: %q", got)
 	}
 }
+
+// Only lowering the minimum says that days already answered keep the old one.
+func TestConfigSavedMinPeople(t *testing.T) {
+	es := i18n.Get("es")
+	note := es.T("config.min_people_lower")
+	g := api.Guild{AnonymityThreshold: 3, SurveyHour: 13, ReportFrequency: "weekly", Language: "es"}
+	k := 3
+	if got := configSaved(es, g, api.GuildPatch{AnonymityThreshold: &k}, 5); !strings.Contains(got, note) {
+		t.Fatalf("lowering 5 → 3 should say it: %q", got)
+	}
+	g.AnonymityThreshold, k = 5, 5
+	if got := configSaved(es, g, api.GuildPatch{AnonymityThreshold: &k}, 3); strings.Contains(got, note) {
+		t.Fatalf("raising 3 → 5 shouldn't: %q", got)
+	}
+	if got := configSaved(es, g, api.GuildPatch{AnonymityThreshold: &k}, 0); strings.Contains(got, note) {
+		t.Fatalf("an unknown previous minimum shouldn't: %q", got)
+	}
+}

@@ -15,6 +15,7 @@ const (
 	actionNote      = "note"      // button: open the comment modal
 	actionNoteModal = "notemodal" // modal submit: record mood + comment
 	actionChange    = "change"    // button on the answer: show the faces again (Mood is the current one)
+	actionRemood    = "remood"    // button on the faces shown by «change»: record the new mood
 	actionStop      = "stop"      // button on surveys sent before «Options»: stop getting this guild's survey
 	actionOptions   = "opts"      // button: the member's options for this guild's survey
 	actionVacation  = "vac"       // button: open the vacation modal
@@ -54,7 +55,7 @@ func parseSurveyID(v string) (surveyID, bool) {
 		return surveyID{}, false
 	}
 	switch p[1] {
-	case actionMood, actionNote, actionNoteModal, actionChange:
+	case actionMood, actionRemood, actionNote, actionNoteModal, actionChange:
 		if mood < 1 || mood > 5 {
 			return surveyID{}, false
 		}

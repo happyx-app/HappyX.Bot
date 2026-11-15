@@ -501,7 +501,7 @@ func oldSurvey(m *discordgo.Message, guildID string) (day string, answered, ok b
 		switch id.Action {
 		case actionMood:
 			return id.Day, false, true
-		case actionNote, actionChange:
+		case actionNote, actionChange, actionRemood: // faces from «change»: the answer stands
 			day, answered, ok = id.Day, true, true
 		}
 	}
@@ -543,6 +543,14 @@ func (b *Bot) policyURL() string {
 		return ""
 	}
 	return b.webURL + "/#/privacy-policy"
+}
+
+// guildName is the server's name as Discord has it cached, or empty.
+func (b *Bot) guildName(guildID string) string {
+	if g, err := b.dg.State.Guild(guildID); err == nil {
+		return g.Name
+	}
+	return ""
 }
 
 // guildIcon is the server's icon URL, or empty when it has none or isn't cached.

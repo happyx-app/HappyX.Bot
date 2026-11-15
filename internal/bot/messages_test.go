@@ -282,7 +282,7 @@ func TestOptions(t *testing.T) {
 	if o.Flags&discordgo.MessageFlagsEphemeral == 0 {
 		t.Fatal("the options are only for whoever pressed the button")
 	}
-	if !strings.Contains(o.Content, "**Equipo** · lu–vi a las 13:00 (Europe/Madrid)") || !strings.Contains(o.Content, "nunca quién ha respondido qué") {
+	if !strings.Contains(o.Content, "**Equipo** · De lunes a viernes a las 13:00 (Europe/Madrid).") || !strings.Contains(o.Content, "nunca quién ha respondido qué") {
 		t.Fatalf("options text: %q", o.Content)
 	}
 	ids := buttonIDs(o.Components)
@@ -330,6 +330,12 @@ func TestOldSurvey(t *testing.T) {
 	done := asMessage(answeredMessage(es, g, surveyID{Action: actionMood, GuildID: g.DiscordID, Day: "2026-10-21", Mood: 3}, "Ana", "x"))
 	if day, answered, ok := oldSurvey(done, g.DiscordID); !ok || !answered || day != "2026-10-21" {
 		t.Fatalf("answered survey: %q %v %v", day, answered, ok)
+	}
+	// «Change answer» left without choosing a face: the answer given still stands.
+	answer := &discordgo.Message{Embeds: answeredMessage(es, g, surveyID{Action: actionMood, GuildID: g.DiscordID, Day: "2026-10-21", Mood: 3}, "Ana", "Semana intensa").Embeds}
+	changing := asMessage(changeMessage(es, g, "2026-10-21", surveyRecipient{Name: "Ana"}, "", answeredQuote(answer)))
+	if day, answered, ok := oldSurvey(changing, g.DiscordID); !ok || !answered || day != "2026-10-21" {
+		t.Fatalf("survey being changed: %q %v %v", day, answered, ok)
 	}
 	if _, _, ok := oldSurvey(open, other.DiscordID); ok {
 		t.Fatal("another server's survey is left alone")
@@ -502,5 +508,26 @@ func TestKudosMenu(t *testing.T) {
 		if got := kudosRefusal(l, giver, c.to, c.inServer); got != c.want {
 			t.Errorf("refusal for %+v: %q, want %q", c.to, got, c.want)
 		}
+	}
+}
+
+func TestChangeKeepsTheCommentInView(t *testing.T) {
+	es := i18n.Get("es")
+	g := api.Guild{DiscordID: "100000000000000001", Name: "Equipo", Anonymous: true}
+	id := surveyID{Action: actionMood, GuildID: g.DiscordID, Day: "2026-10-23", Mood: 4}
+	answer := &discordgo.Message{Embeds: answeredMessage(es, g, id, "Ana", "Semana intensa\npero buen ambiente").Embeds}
+	if got := answeredQuote(answer); got != "> Semana intensa\n> pero buen ambiente" {
+		t.Fatalf("quote: %q", got)
+	}
+	c := changeMessage(es, g, id.Day, surveyRecipient{Name: "Ana"}, "", answeredQuote(answer))
+	if d := c.Embeds[0].Description; !strings.HasSuffix(d, "¿Cómo te encuentras hoy?\n> Semana intensa\n> pero buen ambiente") {
+		t.Fatalf("change card: %q", d)
+	}
+	ids := buttonIDs(c.Components)
+	if len(c.Components) != 1 || len(ids) != 5 || ids[0].Action != actionRemood {
+		t.Fatalf("change card has just the faces: %+v", ids)
+	}
+	if got := answeredQuote(&discordgo.Message{Embeds: answeredMessage(es, g, id, "Ana", "").Embeds}); got != "" {
+		t.Fatalf("no comment, no quote: %q", got)
 	}
 }

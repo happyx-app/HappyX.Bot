@@ -41,6 +41,8 @@ func Previews(code string) []Preview {
 		Timezone: "Europe/Madrid", SurveyHour: 13, ReportFrequency: "weekly", Language: code, KudosChannelID: PreviewChannelID,
 		WorkingDays: presetDays("mon_fri")}
 	b := &Bot{webURL: "https://happyx.example.com", now: func() time.Time { return time.Date(2026, 10, 23, 12, 0, 0, 0, time.UTC) }}
+	cmdID := "900000000000000001" // as once the commands are registered: mentions are clickable
+	b.commandID.Store(&cmdID)
 	public, no := g, false
 	public.Anonymous = false
 	sunToThu := g
@@ -84,6 +86,10 @@ func Previews(code string) []Preview {
 		{Title: "Yesterday's survey, unanswered, once today's arrives", Channel: "DM", Msg: data(closedSurvey(l, g, "2026-10-22"))},
 		{Title: "After answering", Channel: "DM", Msg: data(answered)},
 		{Title: "After adding a comment", Channel: "DM", Msg: data(commented)},
+		{Title: "Change answer (the comment stays)", Channel: "DM",
+			Msg: data(changeMessage(l, g, day, ana, PreviewGuildIcon, answeredQuote(&discordgo.Message{Embeds: commented.Embeds})))},
+		{Title: "Yesterday's survey, answered, once today's arrives", Channel: "DM", Msg: &discordgo.MessageSend{Embeds: commented.Embeds}},
+		{Title: "Survey paused days ago, turned back on", Channel: "DM", Msg: data(b.resumedSurvey(l, g, "2026-10-12", &discordgo.User{ID: ana.ID, Username: "ana"}))},
 		{Title: "Kudos card", Channel: "#kudos", Command: "/happyx kudos", Msg: kudosCard(l, anaP, beaP, kudosMsg, nil)},
 		{Title: "Kudos card from a message (right-click › Apps)", Channel: "#kudos", Command: menuKudos,
 			Msg: kudosCard(l, anaP, beaP, kudosMsg, &kudosOrigin{ChannelID: PreviewGeneralID, Link: link})},

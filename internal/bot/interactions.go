@@ -249,25 +249,27 @@ func (b *Bot) handleSurveyButton(ctx context.Context, i *discordgo.InteractionCr
 	g, l := b.guildAndLocale(ctx, id.GuildID)
 	user := interactionUser(i)
 	switch id.Action {
-	case actionMood:
+	case actionMood, actionRemood:
 		// Changing the mood keeps a comment given earlier that day.
 		e, err := b.api.ChangeMood(ctx, id.GuildID, user.ID, id.Day, id.Mood)
 		if err != nil {
 			b.surveyError(i, l, g, id, err)
 			return
 		}
+		id.Action = actionMood
 		b.respond(i, discordgo.InteractionResponseUpdateMessage, answeredMessage(l, g, id, b.userName(id.GuildID, user), e.Message))
-	case actionChange:
+	case actionChange, actionNote:
 		if !surveyOpen(g, id.Day, b.now()) {
-			b.respond(i, discordgo.InteractionResponseUpdateMessage, closedSurvey(l, g, id.Day))
+			// An answer from a day that can't be changed any more keeps what it shows.
+			b.respond(i, discordgo.InteractionResponseUpdateMessage, noButtons())
 			return
 		}
-		msg := surveyMessage(l, g, id.Day, surveyRecipient{ID: user.ID, Name: b.userName(id.GuildID, user)}, b.guildIcon(id.GuildID))
-		b.respond(i, discordgo.InteractionResponseUpdateMessage, &discordgo.InteractionResponseData{
-			Content: "", Embeds: msg.Embeds, Components: msg.Components, AllowedMentions: msg.AllowedMentions,
-		})
-	case actionNote:
-		b.respond(i, discordgo.InteractionResponseModal, noteModal(l, g, id))
+		if id.Action == actionNote {
+			b.respond(i, discordgo.InteractionResponseModal, noteModal(l, g, id))
+			return
+		}
+		to := surveyRecipient{ID: user.ID, Name: b.userName(id.GuildID, user)}
+		b.respond(i, discordgo.InteractionResponseUpdateMessage, changeMessage(l, g, id.Day, to, b.guildIcon(id.GuildID), answeredQuote(i.Message)))
 	case actionStop: // surveys sent before «Options» still have this button
 		err := b.api.RemoveMember(ctx, id.GuildID, user.ID)
 		if err != nil && !errors.Is(err, api.ErrNotFound) {
@@ -288,7 +290,16 @@ func (b *Bot) handleSurveyButton(ctx context.Context, i *discordgo.InteractionCr
 // closed card, which is what it should have been already.
 func (b *Bot) surveyError(i *discordgo.InteractionCreate, l *i18n.Locale, g api.Guild, id surveyID, err error) {
 	if api.TooOld(err) {
-		b.respond(i, discordgo.InteractionResponseUpdateMessage, closedSurvey(l, g, id.Day))
+		switch id.Action {
+		case actionNoteModal:
+			// The day closed while the comment was being written: say so, with the comment,
+			// rather than drop it.
+			b.ephemeral(i, l.T("survey.note_too_late", "comment", quote(modalValue(i.ModalSubmitData(), "comment"))))
+		case actionRemood:
+			b.respond(i, discordgo.InteractionResponseUpdateMessage, noButtons())
+		default:
+			b.respond(i, discordgo.InteractionResponseUpdateMessage, closedSurvey(l, g, id.Day))
+		}
 		return
 	}
 	b.replyError(i, l, err)
@@ -361,7 +372,7 @@ func (b *Bot) handleCommand(ctx context.Context, i *discordgo.InteractionCreate)
 			b.replyError(i, l, err)
 			return
 		}
-		b.ephemeral(i, l.T("resume.done"))
+		b.ephemeral(i, l.T("resume.done", "guild", b.guildName(i.GuildID)))
 	case cmdVacation:
 		b.cmdVacation(ctx, i, l, user, sub.Options)
 	case cmdConfig:
@@ -425,7 +436,7 @@ func (b *Bot) cmdStatus(ctx context.Context, i *discordgo.InteractionCreate, l *
 // statusMessage is /happyx status: where the member stands, what admins see of their answers,
 // their vacations and, for whoever can see the reports, the server's settings.
 func (b *Bot) statusMessage(l *i18n.Locale, g api.Guild, you, offLine, vacationLines string, paused, settings bool, participants int) *discordgo.InteractionResponseData {
-	text := l.T("options.text", "guild", g.Name, "schedule", surveySchedule(l, g)) + "\n" + you
+	text := l.T("status.text", "guild", g.Name, "you", you, "schedule", surveySchedule(l, g))
 	if offLine != "" {
 		text += "\n" + offLine
 	}

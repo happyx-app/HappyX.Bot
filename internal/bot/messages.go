@@ -41,14 +41,7 @@ const surveyColor = 0x8b5cf6
 // surveyMessage is the daily survey: a card with the question (or the admin's own message), the
 // anonymity notice, and the mood buttons (just their emoji) below. icon is the server's icon, if any.
 func surveyMessage(l *i18n.Locale, g api.Guild, day string, to surveyRecipient, icon string) *discordgo.MessageSend {
-	buttons := make([]discordgo.MessageComponent, 0, len(moodEmojis))
-	for i, emoji := range moodEmojis {
-		buttons = append(buttons, discordgo.Button{
-			Emoji:    &discordgo.ComponentEmoji{Name: emoji},
-			Style:    discordgo.SecondaryButton,
-			CustomID: surveyID{Action: actionMood, GuildID: g.DiscordID, Day: day, Mood: i + 1}.String(),
-		})
-	}
+	buttons := moodButtons(g, day, actionMood)
 	privacy := l.T("survey.anonymous")
 	if !g.Anonymous {
 		privacy = l.T("survey.named")
@@ -82,6 +75,53 @@ func surveyMessage(l *i18n.Locale, g api.Guild, day string, to surveyRecipient, 
 			discordgo.ActionsRow{Components: more},
 		},
 	}
+}
+
+// moodButtons are the five faces, just their emoji, recording the mood with action.
+func moodButtons(g api.Guild, day, action string) []discordgo.MessageComponent {
+	buttons := make([]discordgo.MessageComponent, 0, len(moodEmojis))
+	for i, emoji := range moodEmojis {
+		buttons = append(buttons, discordgo.Button{
+			Emoji:    &discordgo.ComponentEmoji{Name: emoji},
+			Style:    discordgo.SecondaryButton,
+			CustomID: surveyID{Action: action, GuildID: g.DiscordID, Day: day, Mood: i + 1}.String(),
+		})
+	}
+	return buttons
+}
+
+// changeMessage is what «Change answer» turns the answer into: the survey again, with the
+// comment quoted below the question, since choosing another face keeps it, and only the faces.
+// Those faces carry their own action so that, left unchosen, the card still counts as answered.
+func changeMessage(l *i18n.Locale, g api.Guild, day string, to surveyRecipient, icon, quoted string) *discordgo.InteractionResponseData {
+	msg := surveyMessage(l, g, day, to, icon)
+	if quoted != "" {
+		msg.Embeds[0].Description += "\n" + quoted
+	}
+	return &discordgo.InteractionResponseData{
+		Content:         "",
+		Embeds:          msg.Embeds,
+		Components:      []discordgo.MessageComponent{discordgo.ActionsRow{Components: moodButtons(g, day, actionRemood)}},
+		AllowedMentions: msg.AllowedMentions,
+	}
+}
+
+// answeredQuote is the comment quoted on an answer card from answeredMessage, as it is shown
+// there, or "" if the card has none.
+func answeredQuote(m *discordgo.Message) string {
+	if m == nil || len(m.Embeds) == 0 {
+		return ""
+	}
+	d := m.Embeds[0].Description
+	if i := strings.Index(d, "\n> "); i >= 0 {
+		return d[i+1:]
+	}
+	return ""
+}
+
+// noButtons keeps a message as it is but takes its buttons away.
+func noButtons() *discordgo.InteractionResponseData {
+	return &discordgo.InteractionResponseData{Components: []discordgo.MessageComponent{}}
 }
 
 var surveyVar = regexp.MustCompile(`\{\{\s*([a-z.]+)\s*\}\}`)

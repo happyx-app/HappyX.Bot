@@ -52,9 +52,9 @@ func (b *Bot) evolutionURL(guildID string) string {
 	return b.webURL + "/#/me?g=" + guildID
 }
 
-// surveySchedule is when g's survey goes out, like «lu–vi a las 13:00 (Europe/Madrid)».
+// surveySchedule is when g's survey goes out, like «De lunes a viernes a las 13:00 (Europe/Madrid).».
 func surveySchedule(l *i18n.Locale, g api.Guild) string {
-	return l.T("options.schedule", "days", workingDaysText(l, g.WorkingDays), "hour", fmt.Sprintf("%02d", g.SurveyHour), "timezone", g.Timezone)
+	return l.T("options.schedule", "days", daysLabel(l, g.WorkingDays), "hour", fmt.Sprintf("%02d", g.SurveyHour), "timezone", g.Timezone)
 }
 
 // privacyLine says what the admins see of the member's answers.
@@ -93,8 +93,9 @@ func (b *Bot) handleOptions(ctx context.Context, i *discordgo.InteractionCreate,
 			return
 		}
 		content := l.T("options.paused_cmd", "guild", g.Name, "resume_cmd", b.resumeMention())
-		if id.Msg != "" {
-			// The survey card turns into the paused one, which can bring the survey back.
+		if id.Msg != "" && surveyOpen(g, id.Day, b.now()) {
+			// The survey card turns into the paused one, which can bring the survey back. An
+			// older card, closed since the options were opened, stays as it is.
 			if _, err := b.dg.ChannelMessageEditComplex(pausedEdit(l, g, id.Day, i.ChannelID, id.Msg)); err != nil {
 				b.log.Warn("show paused survey", "guild", id.GuildID, "err", err)
 			} else {
@@ -115,7 +116,7 @@ func (b *Bot) handleOptions(ctx context.Context, i *discordgo.InteractionCreate,
 			return
 		}
 		b.respond(i, discordgo.InteractionResponseUpdateMessage, &discordgo.InteractionResponseData{
-			Content: l.T("resume.done"), Components: []discordgo.MessageComponent{}, AllowedMentions: &discordgo.MessageAllowedMentions{},
+			Content: l.T("resume.done", "guild", g.Name), Components: []discordgo.MessageComponent{}, AllowedMentions: &discordgo.MessageAllowedMentions{},
 		})
 	case actionVacation:
 		b.respond(i, discordgo.InteractionResponseModal, vacationModal(l, id))
@@ -167,10 +168,19 @@ func pausedEdit(l *i18n.Locale, g api.Guild, day, channelID, messageID string) *
 }
 
 // resumedSurvey is what the paused card turns into: the survey again while it is still open
-// (today's or yesterday's), or a closed card for an older day.
+// (today's or yesterday's), or, for an older day, a grey card saying the next one will come.
 func (b *Bot) resumedSurvey(l *i18n.Locale, g api.Guild, day string, user *discordgo.User) *discordgo.InteractionResponseData {
 	if !surveyOpen(g, day, b.now()) {
-		return closedSurvey(l, g, day)
+		return &discordgo.InteractionResponseData{
+			Content: "",
+			Embeds: []*discordgo.MessageEmbed{{
+				Author:      &discordgo.MessageEmbedAuthor{Name: l.T("survey.title", "guild", g.Name)},
+				Description: l.T("survey.resumed"),
+				Color:       closedColor,
+			}},
+			Components:      []discordgo.MessageComponent{},
+			AllowedMentions: &discordgo.MessageAllowedMentions{},
+		}
 	}
 	msg := surveyMessage(l, g, day, surveyRecipient{ID: user.ID, Name: b.userName(g.DiscordID, user)}, b.guildIcon(g.DiscordID))
 	return &discordgo.InteractionResponseData{Embeds: msg.Embeds, Components: msg.Components, AllowedMentions: msg.AllowedMentions}

@@ -15,7 +15,9 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 
@@ -54,6 +56,7 @@ func main() {
 	lang := flag.String("lang", i18n.Default, "language code: "+strings.Join(i18n.Codes(), ", "))
 	out := flag.String("out", "preview.html", "file to write")
 	flag.Parse()
+	loc = i18n.Get(*lang)
 
 	var b strings.Builder
 	b.WriteString(head)
@@ -185,6 +188,7 @@ var (
 	reMention = regexp.MustCompile(`&lt;@(\d+)&gt;`)
 	reChannel = regexp.MustCompile(`&lt;#(\d+)&gt;`)
 	reCommand = regexp.MustCompile(`&lt;/([^:&]+):\d+&gt;`)
+	reDate    = regexp.MustCompile(`&lt;t:(\d+):D&gt;`)
 	reBold    = regexp.MustCompile(`\*\*(.+?)\*\*`)
 	reCode    = regexp.MustCompile("`([^`]+)`")
 )
@@ -220,6 +224,9 @@ func markdown(s string) string {
 	return out.String()
 }
 
+// loc is the language the preview is written in.
+var loc *i18n.Locale
+
 func inline(s string) string {
 	s = reMention.ReplaceAllStringFunc(s, func(m string) string {
 		return "<span class=\"mention\">@" + name(reMention.FindStringSubmatch(m)[1]) + "</span>"
@@ -227,7 +234,21 @@ func inline(s string) string {
 	s = reChannel.ReplaceAllStringFunc(s, func(m string) string {
 		return "<span class=\"mention\">#" + name(reChannel.FindStringSubmatch(m)[1]) + "</span>"
 	})
-	s = reCommand.ReplaceAllString(s, `<span class="mention">/$1</span>`)
+	// Discord shows commands by their name in the reader's language, and dates written out.
+	s = reCommand.ReplaceAllStringFunc(s, func(m string) string {
+		words := strings.Fields(reCommand.FindStringSubmatch(m)[1])
+		for i, w := range words[1:] {
+			if key := "cmd." + w + ".name"; loc.Has(key) {
+				words[i+1] = loc.T(key)
+			}
+		}
+		return `<span class="mention">/` + strings.Join(words, " ") + `</span>`
+	})
+	s = reDate.ReplaceAllStringFunc(s, func(m string) string {
+		sec, _ := strconv.ParseInt(reDate.FindStringSubmatch(m)[1], 10, 64)
+		t := time.Unix(sec, 0).UTC()
+		return fmt.Sprintf("%d %s %d", t.Day(), loc.List("date.months_long")[t.Month()-1], t.Year())
+	})
 	s = reBold.ReplaceAllString(s, "<b>$1</b>")
 	return reCode.ReplaceAllString(s, "<code>$1</code>")
 }

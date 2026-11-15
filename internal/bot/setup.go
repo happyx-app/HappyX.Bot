@@ -47,6 +47,8 @@ const (
 	setupFrequency = "freq"      // select
 	setupReportDM  = "dm"        // select
 	setupKudos     = "kudos"     // select
+	setupTeam      = "team"      // select: the team channel
+	setupSummary   = "summary"   // select: the Monday summary
 	setupGames     = "games"     // select
 	setupPlayers   = "players"   // select: game role filter mode
 	setupGameRoles = "gameroles" // select: game roles
@@ -184,6 +186,19 @@ func setupComponents(l *i18n.Locale, d setupData, page string) []discordgo.Messa
 		)
 		if ch, ok := findChannel(d.Channels, g.KudosChannelID); ok && !ch.CanPost {
 			c = append(c, text(l.T("setup.kudos_cant", "channel", ch.Name)))
+		}
+		c = append(c,
+			text("**"+l.T("setup.team")+"**\n-# "+l.T("setup.team_desc")),
+			sel(setupTeam, l.T("setup.team"), teamOptions(l, d.Channels, g)),
+		)
+		if ch, ok := findChannel(d.Channels, g.TeamChannelID); ok && !ch.CanPost {
+			c = append(c, text(l.T("setup.kudos_cant", "channel", ch.Name)))
+		}
+		if g.TeamChannel() != "" {
+			c = append(c, sel(setupSummary, l.T("setup.team"), []discordgo.SelectMenuOption{
+				{Label: l.T("setup.summary_on"), Description: l.T("setup.summary_on_desc"), Value: "yes", Default: g.TeamSummary},
+				{Label: l.T("setup.summary_off"), Value: "no", Default: !g.TeamSummary},
+			}))
 		}
 		c = append(c, label(l.T("setup.game")), sel(setupGames, l.T("setup.game"), []discordgo.SelectMenuOption{
 			{Label: l.T("setup.game_off"), Value: "no", Default: !g.GamesEnabled},
@@ -404,6 +419,20 @@ func kudosOptions(l *i18n.Locale, channels []api.Channel, current string) []disc
 	return opts
 }
 
+// teamOptions are "the kudos channel's" (or none, without one) and the channels, those the bot
+// can post in first.
+func teamOptions(l *i18n.Locale, channels []api.Channel, g api.Guild) []discordgo.SelectMenuOption {
+	first := l.T("setup.team_none")
+	if ch, ok := findChannel(channels, g.KudosChannelID); ok {
+		first = l.T("setup.team_kudos", "channel", "#"+truncate(ch.Name, 80))
+	}
+	opts := []discordgo.SelectMenuOption{{Label: first, Value: "-", Default: g.TeamChannelID == ""}}
+	for _, ch := range channelOptions(channels, g.TeamChannelID, maxOptions-1) {
+		opts = append(opts, discordgo.SelectMenuOption{Label: "#" + truncate(ch.Name, 99), Value: ch.ID, Default: ch.ID == g.TeamChannelID})
+	}
+	return opts
+}
+
 // channelOptions picks up to n channels: current (if any), then those the bot can post in.
 func channelOptions(channels []api.Channel, current string, n int) []api.Channel {
 	var out []api.Channel
@@ -508,6 +537,13 @@ func setupPatch(id setupID, values []string) (p api.GuildPatch, page string, sav
 			v = ""
 		}
 		p.KudosChannelID = &v
+	case setupTeam:
+		if v == "-" {
+			v = ""
+		}
+		p.TeamChannelID = &v
+	case setupSummary:
+		p.TeamSummary = &yes
 	case setupGames:
 		p.GamesEnabled = &yes
 	case setupStart, setupStop:

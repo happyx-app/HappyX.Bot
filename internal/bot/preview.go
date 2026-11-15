@@ -74,6 +74,21 @@ func Previews(code string) []Preview {
 	games.GamesEnabled = true
 	yes := true
 
+	withAudience := previewReport()
+	withAudience.Audience = 12
+	prevWeek := previewReport()
+	prevWeek.Average, prevWeek.Distribution = 3.4, map[string]int{"2": 6, "3": 12, "4": 14, "5": 4}
+	note := api.TeamNote{ID: 1, AuthorDiscordID: PreviewAdminID, AuthorUsername: "alex", From: "2026-10-19", To: "2026-10-25",
+		Body:      "Muchas reuniones seguidas: lo hemos visto. Desde el lunes, martes por la tarde sin reuniones. Lo revisamos en dos semanas.",
+		ChannelID: PreviewChannelID, MessageID: "600000000000000001"}
+	told := answeredMessage(l, g, surveyID{Action: actionMood, GuildID: g.DiscordID, Day: "2026-10-26", Mood: 4}, "Ana", "")
+	if row, ok := told.Components[0].(discordgo.ActionsRow); ok {
+		row.Components = append(row.Components, discordgo.Button{Label: l.T("answer.told_button", "name", "alex"), Style: discordgo.LinkButton,
+			URL: messageLink(g.DiscordID, note.ChannelID, note.MessageID)})
+		told.Components[0] = row
+	}
+	summaryReport := api.Report{Respondents: 9, Audience: 12, Kudos: api.KudosSummary{Count: 6, Receivers: 4}}
+
 	text := func(s string) *discordgo.MessageSend { return &discordgo.MessageSend{Content: s} }
 	data := func(d *discordgo.InteractionResponseData) *discordgo.MessageSend {
 		return &discordgo.MessageSend{Content: d.Content, Embeds: d.Embeds, Components: d.Components}
@@ -127,6 +142,12 @@ func Previews(code string) []Preview {
 		{Title: "Weekly report", Channel: "DM", Msg: reportMessage(l, g, previewReport())},
 		{Title: "Weekly report with a day below the threshold", Channel: "DM", Msg: reportMessage(l, g, previewPartlyWithheld())},
 		{Title: "Weekly report when no day reached the threshold", Channel: "DM", Msg: reportMessage(l, g, previewWithheld())},
+		{Title: "Weekly report (with the week before, «Tell the team» and the dashboard)", Channel: "DM", Msg: reportMessageWith(l, g, withAudience, reportOptions{
+			Tell: true, DashboardURL: "https://happyx.example.com/#/g/" + PreviewGuildID + "?p=last-week", Previous: &prevWeek})},
+		{Title: "«Tell the team» published", Channel: "DM", Ephemeral: true, Msg: data(published(l, g.DiscordID, note, l.T("team.published", "channel", "<#"+PreviewChannelID+">")))},
+		{Title: "What the team sees", Channel: "#kudos", Msg: teamCard(l, note)},
+		{Title: "After answering, the survey day after an admin told the team", Channel: "DM", Msg: data(told)},
+		{Title: "Monday summary", Channel: "#kudos", Msg: teamSummary(l, games, week, summaryReport, &api.GameRound{Week: week, Question: question, Phase: "finished", Answers: 7, MinAnswers: 4}, gameLink+"?history")},
 		{Title: "Setting the fewest people", Channel: "#general", Command: "/happyx config min_people:5", Ephemeral: true,
 			Msg: text(configSaved(l, fivePeople, api.GuildPatch{AnonymityThreshold: &five}, 3))},
 		{Title: "Lowering the fewest people", Channel: "#general", Command: "/happyx config min_people:3", Ephemeral: true,

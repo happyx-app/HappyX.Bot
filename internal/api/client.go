@@ -81,8 +81,14 @@ type Guild struct {
 	SurveyEnabled  *bool  `json:"survey_enabled"`
 	Language       string `json:"language"`
 	KudosChannelID string `json:"kudos_channel_id"` // empty: where the command is used
-	GamesEnabled   bool   `json:"games_enabled"`
-	WorkingDays    []int  `json:"working_days"` // ISO days the survey goes out, 1 is Monday
+	// TeamChannelID is where HappyX tells the team things: what admins say after a report and
+	// the Monday summary. Empty means the kudos channel.
+	TeamChannelID string `json:"team_channel_id"`
+	// TeamSummary posts the week's summary in the team channel every Monday. Missing (an older
+	// API) means false: nothing new is posted until the API knows about it.
+	TeamSummary  bool  `json:"team_summary"`
+	GamesEnabled bool  `json:"games_enabled"`
+	WorkingDays  []int `json:"working_days"` // ISO days the survey goes out, 1 is Monday
 	// SurveyMessage is the admin's own survey text with {{placeholders}}; empty means the default.
 	SurveyMessage string `json:"survey_message"`
 	// SurveyRoles and GameRoles narrow by role who gets the survey and who plays the game.
@@ -121,6 +127,15 @@ func (g Guild) AnonymousOn(day string) bool { return g.Anonymous || day < g.Name
 // names start the next day.
 func (g Guild) NamedSoon(day string) bool { return !g.Anonymous && day < g.NamedSince }
 
+// TeamChannel is where HappyX tells the team things: the team channel, or the kudos channel
+// while there is none. Empty when neither is set.
+func (g Guild) TeamChannel() string {
+	if g.TeamChannelID != "" {
+		return g.TeamChannelID
+	}
+	return g.KudosChannelID
+}
+
 // SendsReportDM reports whether the main admin gets the report as a DM.
 func (g Guild) SendsReportDM() bool { return g.ReportDM == nil || *g.ReportDM }
 
@@ -147,6 +162,8 @@ type GuildPatch struct {
 	AdminDiscordID     *string     `json:"admin_discord_user_id,omitempty"`
 	Language           *string     `json:"language,omitempty"`
 	KudosChannelID     *string     `json:"kudos_channel_id,omitempty"`
+	TeamChannelID      *string     `json:"team_channel_id,omitempty"`
+	TeamSummary        *bool       `json:"team_summary,omitempty"`
 	GamesEnabled       *bool       `json:"games_enabled,omitempty"`
 	WorkingDays        []int       `json:"working_days,omitempty"`
 	ReportDM           *bool       `json:"report_dm,omitempty"`
@@ -172,6 +189,8 @@ type Report struct {
 	Days               []ReportDay    `json:"days"`
 	Messages           []ReportMsg    `json:"messages"`
 	Kudos              KudosSummary   `json:"kudos"`
+	// Audience is how many people get the survey now; 0 when unknown.
+	Audience int `json:"audience"`
 }
 
 // Counted is how many answers Average and Distribution cover: Responses but the withheld days'.
@@ -525,6 +544,60 @@ func (c *Client) AnswerGame(ctx context.Context, guildID, week, userID, answer s
 func (c *Client) ProposeQuestion(ctx context.Context, guildID, userID, question string) error {
 	return c.do(ctx, http.MethodPut, "/v1/guilds/"+url.PathEscape(guildID)+"/game/proposals/"+url.PathEscape(userID),
 		map[string]string{"question": question}, nil)
+}
+
+// TeamNote is what an admin told the team in a channel after a report.
+type TeamNote struct {
+	ID              int64  `json:"id"`
+	AuthorDiscordID string `json:"author_discord_user_id"`
+	AuthorUsername  string `json:"author_username"`
+	From            string `json:"from"`
+	To              string `json:"to"`
+	Body            string `json:"body"`
+	ChannelID       string `json:"channel_id"`
+	MessageID       string `json:"message_id"`
+	PostedOn        string `json:"posted_on"`
+}
+
+// TeamNoteMaxLength is the API's limit on a note's text.
+const TeamNoteMaxLength = 1000
+
+// PublishTeamNote records a note the bot has just published in a channel. It fails with
+// ErrNotFound when the author isn't a member of the guild.
+func (c *Client) PublishTeamNote(ctx context.Context, guildID string, n TeamNote) (TeamNote, error) {
+	var out TeamNote
+	err := c.do(ctx, http.MethodPost, teamNotesPath(guildID), map[string]string{
+		"author_discord_user_id": n.AuthorDiscordID, "from": n.From, "to": n.To, "body": n.Body,
+		"channel_id": n.ChannelID, "message_id": n.MessageID,
+	}, &out)
+	return out, err
+}
+
+func (c *Client) TeamNote(ctx context.Context, guildID string, id int64) (TeamNote, error) {
+	var out TeamNote
+	err := c.do(ctx, http.MethodGet, teamNotesPath(guildID)+"/"+strconv.FormatInt(id, 10), nil, &out)
+	return out, err
+}
+
+func (c *Client) EditTeamNote(ctx context.Context, guildID string, id int64, body string) (TeamNote, error) {
+	var out TeamNote
+	err := c.do(ctx, http.MethodPatch, teamNotesPath(guildID)+"/"+strconv.FormatInt(id, 10), map[string]string{"body": body}, &out)
+	return out, err
+}
+
+func (c *Client) DeleteTeamNote(ctx context.Context, guildID string, id int64) error {
+	return c.do(ctx, http.MethodDelete, teamNotesPath(guildID)+"/"+strconv.FormatInt(id, 10), nil, nil)
+}
+
+// CurrentTeamNote is the note the thanks card points to for answers on day: ErrNotFound if none.
+func (c *Client) CurrentTeamNote(ctx context.Context, guildID, day string) (TeamNote, error) {
+	var out TeamNote
+	err := c.do(ctx, http.MethodGet, teamNotesPath(guildID)+"/current?"+url.Values{"day": {day}}.Encode(), nil, &out)
+	return out, err
+}
+
+func teamNotesPath(guildID string) string {
+	return "/v1/guilds/" + url.PathEscape(guildID) + "/team-notes"
 }
 
 func gameRoundPath(guildID, week string) string {

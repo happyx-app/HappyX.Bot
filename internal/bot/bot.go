@@ -355,6 +355,11 @@ func (b *Bot) tick(ctx context.Context) {
 		if from, to, due := schedule.ReportDue(st, now); due && g.SendsReportDM() {
 			b.dispatch(ctx, g, "report", from, func() (delivery, error) { return b.sendReport(ctx, g, from, to) })
 		}
+		if g.TeamSummary && g.TeamChannel() != "" {
+			if week, due := schedule.SummaryDue(st, now); due {
+				b.dispatch(ctx, g, "team_summary", week, func() (delivery, error) { return b.sendTeamSummary(ctx, g, week) })
+			}
+		}
 		if !g.GamesEnabled {
 			continue
 		}
@@ -593,7 +598,7 @@ func (b *Bot) sendReport(ctx context.Context, g api.Guild, from, to string) (del
 		b.log.Info("report skipped: nothing in the period", "guild", g.DiscordID, "from", from, "to", to)
 		return delivery{}, nil
 	}
-	if err := b.dm(g.AdminDiscordID, reportMessage(i18n.Get(g.Language), g, r)); err != nil {
+	if err := b.dm(g.AdminDiscordID, reportMessageWith(i18n.Get(g.Language), g, r, b.reportOptions(ctx, g, r, true))); err != nil {
 		return delivery{recipients: 1, failed: 1}, err
 	}
 	return delivery{recipients: 1}, nil

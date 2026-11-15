@@ -634,7 +634,7 @@ func TestTextSummaryLeavesWithheldDaysOut(t *testing.T) {
 	if r.Counted() != 4 {
 		t.Fatalf("counted = %d, want 4", r.Counted())
 	}
-	if got := textSummary(es, r); !strings.Contains(got, "🙂 "+bar(2, 4)+" 2") {
+	if got := textSummary(es, r, reportOptions{}); !strings.Contains(got, "🙂 "+bar(2, 4)+" 2") {
 		t.Fatalf("bars should be out of the counted answers: %q", got)
 	}
 }
@@ -643,7 +643,7 @@ func TestReportNamesWithheldDays(t *testing.T) {
 	es := i18n.Get("es")
 	r := api.Report{Responses: 10, Respondents: 4, Average: 4, AnonymityThreshold: 3, Distribution: map[string]int{"4": 8},
 		Days: []api.ReportDay{{Day: "2026-10-19", Responses: 8, Average: 4}, {Day: "2026-10-20", Responses: 2, Withheld: true}}}
-	if got := summary(es, r); !strings.HasSuffix(got, "\n-# Sin contar ma 20 oct en la media, la distribución ni los comentarios: respondieron menos de 3 personas.") {
+	if got := summary(es, r, reportOptions{}); !strings.HasSuffix(got, "\n-# Sin contar ma 20 oct en la media, la distribución ni los comentarios: respondieron menos de 3 personas.") {
 		t.Fatalf("summary: %q", got)
 	}
 	// After lowering the threshold, a day judged by the old one says so.

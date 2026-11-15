@@ -276,7 +276,7 @@ func reportMessage(l *i18n.Locale, g api.Guild, r api.Report) *discordgo.Message
 	}
 	msg := &discordgo.MessageSend{Embeds: []*discordgo.MessageEmbed{embed}}
 	if r.Withheld {
-		// Too few people answered to show anything but how many: no image, no comments.
+		// Every answer fell on a day with too few people to show more than how many: no image, no comments.
 		embed.Color = surveyColor
 		embed.Description = l.T("report.withheld", "n", r.Respondents, "k", max(r.AnonymityThreshold, api.MinAnonymityThreshold)) +
 			kudosSection(l, r.Kudos)
@@ -399,7 +399,7 @@ func textSummary(l *i18n.Locale, r api.Report) string {
 	b.WriteString("\n\n")
 	for i := len(moodEmojis); i >= 1; i-- {
 		n := r.Distribution[fmt.Sprint(i)]
-		fmt.Fprintf(&b, "%s %s %d\n", moodEmoji(i), bar(n, r.Responses), n)
+		fmt.Fprintf(&b, "%s %s %d\n", moodEmoji(i), bar(n, r.Counted()), n)
 	}
 	return b.String() + "\n"
 }

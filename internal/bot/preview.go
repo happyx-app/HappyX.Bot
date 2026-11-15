@@ -123,7 +123,7 @@ func Previews(code string) []Preview {
 		{Title: "Vacation an admin set on the web", Channel: "DM", Msg: text(l.T("vacation.notice", "admin", "<@"+PreviewAdminID+">", "server", g.Name,
 			"from", discordDate("2026-12-20"), "to", discordDate("2027-01-06"), "link", "<https://happyx.example.com/#/me>"))},
 		{Title: "Weekly report", Channel: "DM", Msg: reportMessage(l, g, previewReport())},
-		{Title: "Weekly report when fewer people than the threshold answered", Channel: "DM", Msg: reportMessage(l, g, previewWithheld())},
+		{Title: "Weekly report when no day reached the threshold", Channel: "DM", Msg: reportMessage(l, g, previewWithheld())},
 		{Title: "Setting the fewest people", Channel: "#general", Command: "/happyx config min_people:5", Ephemeral: true,
 			Msg: text(configSaved(l, fivePeople, api.GuildPatch{AnonymityThreshold: &five}))},
 		{Title: "Turning the game on", Channel: "#general", Command: "/happyx config games:True", Ephemeral: true,
@@ -225,7 +225,7 @@ func previewReport() api.Report {
 	return r
 }
 
-// previewWithheld is a week only two people answered, below the threshold of 3.
+// previewWithheld is a week where no day had answers from 3 people, the threshold.
 func previewWithheld() api.Report {
 	r := api.Report{From: "2026-10-19", To: "2026-10-25", Anonymous: true, AnonymityThreshold: 3, Withheld: true,
 		Responses: 6, Respondents: 2, Distribution: map[string]int{}}

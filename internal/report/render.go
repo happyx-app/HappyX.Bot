@@ -319,8 +319,8 @@ func drawDistribution(dc *gg.Context, l *i18n.Locale, r api.Report, top, h float
 		}
 
 		pct := 0
-		if r.Responses > 0 {
-			pct = int(math.Round(float64(n) * 100 / float64(r.Responses)))
+		if c := r.Counted(); c > 0 {
+			pct = int(math.Round(float64(n) * 100 / float64(c)))
 		}
 		setFont(dc, medium, 18)
 		dc.SetColor(colText)

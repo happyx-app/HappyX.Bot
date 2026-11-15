@@ -160,8 +160,9 @@ type Report struct {
 	From           string `json:"from"`
 	To             string `json:"to"`
 	Anonymous      bool   `json:"anonymous"`
-	// Withheld: the period's anonymous answers came from fewer people than AnonymityThreshold,
-	// so only the counts are given.
+	// A day whose anonymous answers came from fewer people than AnonymityThreshold is withheld
+	// and counts only in Responses: Average, Distribution and Messages leave it out. Withheld:
+	// every answer fell on such days, so only the counts are given.
 	AnonymityThreshold int            `json:"anonymity_threshold"`
 	Withheld           bool           `json:"withheld"`
 	Responses          int            `json:"responses"`
@@ -171,6 +172,15 @@ type Report struct {
 	Days               []ReportDay    `json:"days"`
 	Messages           []ReportMsg    `json:"messages"`
 	Kudos              KudosSummary   `json:"kudos"`
+}
+
+// Counted is how many answers Average and Distribution cover: Responses but the withheld days'.
+func (r Report) Counted() int {
+	n := 0
+	for _, c := range r.Distribution {
+		n += c
+	}
+	return n
 }
 
 // KudosSummary counts the period's kudos; Highlights are the latest few, newest first.

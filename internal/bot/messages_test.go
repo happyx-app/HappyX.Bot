@@ -589,7 +589,7 @@ func TestWithheldReport(t *testing.T) {
 	if len(m.Files) != 0 || m.Embeds[0].Image != nil {
 		t.Fatal("a withheld report has no image")
 	}
-	want := "**Personas que han respondido:** 2\nCon menos de 3 no se muestran media ni comentarios, para que nadie pueda saber quién ha dicho qué."
+	want := "**Personas que han respondido:** 2\nNingún día han respondido 3 personas o más. Para que nadie pueda saber quién ha dicho qué, no se muestran medias ni comentarios."
 	if d := m.Embeds[0].Description; d != want {
 		t.Fatalf("withheld report: %q", d)
 	}
@@ -624,5 +624,17 @@ func TestMinPeopleOptions(t *testing.T) {
 	}
 	if _, _, _, ok := setupPatch(setupID{Action: setupMinPeople, Page: "1"}, []string{"2"}); ok {
 		t.Fatal("2 is below the minimum")
+	}
+}
+
+// Withheld days count only in the answers: the bars are out of the answers the API counted.
+func TestTextSummaryLeavesWithheldDaysOut(t *testing.T) {
+	es := i18n.Get("es")
+	r := api.Report{Responses: 5, Respondents: 3, Average: 4, Distribution: map[string]int{"4": 2, "5": 2}}
+	if r.Counted() != 4 {
+		t.Fatalf("counted = %d, want 4", r.Counted())
+	}
+	if got := textSummary(es, r); !strings.Contains(got, "🙂 "+bar(2, 4)+" 2") {
+		t.Fatalf("bars should be out of the counted answers: %q", got)
 	}
 }

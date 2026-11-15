@@ -56,7 +56,6 @@ const (
 )
 
 func commands() []*discordgo.ApplicationCommand {
-	no := false
 	minHour := 0.0
 	one := 1
 	en := i18n.Get(i18n.Default)
@@ -123,14 +122,18 @@ func commands() []*discordgo.ApplicationCommand {
 	}
 
 	kudosMenu := func(t discordgo.ApplicationCommandType) *discordgo.ApplicationCommand {
-		return &discordgo.ApplicationCommand{Type: t, Name: menuKudos, NameLocalizations: localized("menu.kudos"), DMPermission: &no}
+		guildOnly := []discordgo.InteractionContextType{discordgo.InteractionContextGuild}
+		return &discordgo.ApplicationCommand{Type: t, Name: menuKudos, NameLocalizations: localized("menu.kudos"), Contexts: &guildOnly}
 	}
 
+	// /happyx also works in a DM with the bot, for the member's own survey: Discord sets where a
+	// command shows per command, not per subcommand.
+	contexts := []discordgo.InteractionContextType{discordgo.InteractionContextGuild, discordgo.InteractionContextBotDM}
 	return []*discordgo.ApplicationCommand{{
 		Name:                     "happyx",
 		Description:              en.T("cmd.description"),
 		DescriptionLocalizations: localized("cmd.description"),
-		DMPermission:             &no,
+		Contexts:                 &contexts,
 		Options: []*discordgo.ApplicationCommandOption{
 			sub(cmdStatus),
 			sub(cmdPause),
@@ -185,6 +188,10 @@ func (b *Bot) onInteraction(s *discordgo.Session, i *discordgo.InteractionCreate
 		customID := i.MessageComponentData().CustomID
 		if id, ok := parseTeamID(customID); ok {
 			b.handleTeam(ctx, i, id)
+			return
+		}
+		if id, ok := parseDMID(customID); ok {
+			b.handleDMPick(ctx, i, id)
 			return
 		}
 		if id, ok := parseSetupID(customID); ok {
@@ -279,7 +286,7 @@ func (b *Bot) handleSurveyButton(ctx context.Context, i *discordgo.InteractionCr
 			return
 		}
 		id.Action = actionMood
-		b.respond(i, discordgo.InteractionResponseUpdateMessage, b.withTold(ctx, l, id, answeredMessage(l, g, id, b.userName(id.GuildID, user), e.Message)))
+		b.respond(i, discordgo.InteractionResponseUpdateMessage, carriedGame(i.Message).onto(b.thanks(ctx, l, g, id, user, e.Message)))
 	case actionChange, actionNote:
 		if !surveyOpen(g, id.Day, b.now()) {
 			// An answer from a day that can't be changed any more keeps what it shows.
@@ -290,8 +297,10 @@ func (b *Bot) handleSurveyButton(ctx context.Context, i *discordgo.InteractionCr
 			b.respond(i, discordgo.InteractionResponseModal, noteModal(l, g, id))
 			return
 		}
-		to := surveyRecipient{ID: user.ID, Name: b.userName(id.GuildID, user)}
-		b.respond(i, discordgo.InteractionResponseUpdateMessage, changeMessage(l, g, id.Day, to, b.guildIcon(id.GuildID), answeredQuote(i.Message)))
+		to := surveyRecipient{ID: user.ID, Name: b.userName(id.GuildID, user), Yesterday: b.yesterday(g, id.Day)}
+		b.respond(i, discordgo.InteractionResponseUpdateMessage, carriedGame(i.Message).onto(changeMessage(l, g, id.Day, to, b.guildIcon(id.GuildID), answeredQuote(i.Message))))
+	case actionAnswer:
+		b.answerFromChannel(ctx, i, id)
 	case actionStop: // surveys sent before «Options» still have this button
 		err := b.api.RemoveMember(ctx, id.GuildID, user.ID)
 		if err != nil && !errors.Is(err, api.ErrNotFound) {
@@ -347,7 +356,7 @@ func (b *Bot) handleNoteModal(ctx context.Context, i *discordgo.InteractionCreat
 		b.surveyError(i, l, g, id, err)
 		return
 	}
-	b.respond(i, discordgo.InteractionResponseUpdateMessage, b.withTold(ctx, l, id, answeredMessage(l, g, id, b.userName(id.GuildID, user), comment)))
+	b.respond(i, discordgo.InteractionResponseUpdateMessage, carriedGame(i.Message).onto(b.thanks(ctx, l, g, id, user, comment)))
 }
 
 func modalValue(data discordgo.ModalSubmitInteractionData, field string) string {
@@ -365,7 +374,7 @@ func modalValue(data discordgo.ModalSubmitInteractionData, field string) string 
 	return ""
 }
 
-// --- Slash commands (in a server) ---
+// --- Slash commands (in a server; dm.go has the ones that also work in a DM) ---
 
 func (b *Bot) handleCommand(ctx context.Context, i *discordgo.InteractionCreate) {
 	data := i.ApplicationCommandData()
@@ -373,10 +382,14 @@ func (b *Bot) handleCommand(ctx context.Context, i *discordgo.InteractionCreate)
 		b.cmdKudosMenu(i, b.userLocale(ctx, i), interactionUser(i))
 		return
 	}
-	if data.Name != "happyx" || len(data.Options) == 0 || i.GuildID == "" {
+	if data.Name != "happyx" || len(data.Options) == 0 {
 		return
 	}
 	sub := data.Options[0]
+	if i.GuildID == "" {
+		b.handleDMCommand(ctx, i, sub)
+		return
+	}
 	user := interactionUser(i)
 	l := b.userLocale(ctx, i)
 	switch sub.Name {
@@ -388,21 +401,25 @@ func (b *Bot) handleCommand(ctx context.Context, i *discordgo.InteractionCreate)
 			b.replyError(i, l, err)
 			return
 		}
+		if g, gl := b.guildAndLocale(ctx, i.GuildID); g.DiscordID != "" {
+			b.syncSurveyCard(gl, g, user, true)
+		}
 		b.ephemeral(i, l.T("pause.done", "resume_cmd", b.resumeMention()))
 	case cmdResume:
-		if err := b.resume(ctx, i.GuildID, user); err != nil {
+		g, gl := b.guildAndLocale(ctx, i.GuildID)
+		if g.DiscordID == "" {
+			g.DiscordID = i.GuildID
+		}
+		ended, err := b.resume(ctx, g, user)
+		if err != nil {
 			b.replyError(i, l, err)
 			return
 		}
-		g, _ := b.guildAndLocale(ctx, i.GuildID)
+		b.syncSurveyCard(gl, g, user, false)
 		if g.Name == "" {
 			g.Name = b.guildName(i.GuildID)
 		}
-		if g.Name == "" {
-			b.ephemeral(i, l.T("resume.done_here"))
-			return
-		}
-		b.ephemeral(i, l.T("resume.done", "guild", g.Name))
+		b.ephemeral(i, resumedText(l, g.Name, ended))
 	case cmdVacation:
 		b.cmdVacation(ctx, i, l, user, sub.Options)
 	case cmdConfig:
@@ -425,20 +442,29 @@ func (b *Bot) cmdStatus(ctx context.Context, i *discordgo.InteractionCreate, l *
 		b.replyError(i, l, err)
 		return
 	}
-	members, err := b.api.Members(ctx, i.GuildID)
+	discordAdmin := i.Member != nil && i.Member.Permissions&discordgo.PermissionAdministrator != 0
+	data, err := b.status(ctx, l, g, user, discordAdmin)
 	if err != nil {
 		b.replyError(i, l, err)
 		return
 	}
-	recipients, err := b.api.SurveyRecipients(ctx, i.GuildID, false)
+	b.respond(i, discordgo.InteractionResponseChannelMessageWithSource, data)
+}
+
+// status is /happyx status for g, in a server or in a DM. discordAdmin is whether Discord says
+// the user administers the server, which only a command run in it can tell.
+func (b *Bot) status(ctx context.Context, l *i18n.Locale, g api.Guild, user *discordgo.User, discordAdmin bool) (*discordgo.InteractionResponseData, error) {
+	members, err := b.api.Members(ctx, g.DiscordID)
 	if err != nil {
-		b.replyError(i, l, err)
-		return
+		return nil, err
 	}
-	vacations, err := b.api.Vacations(ctx, i.GuildID, user.ID)
+	recipients, err := b.api.SurveyRecipients(ctx, g.DiscordID, false)
+	if err != nil {
+		return nil, err
+	}
+	vacations, err := b.api.Vacations(ctx, g.DiscordID, user.ID)
 	if err != nil && !errors.Is(err, api.ErrNotFound) {
-		b.replyError(i, l, err)
-		return
+		return nil, err
 	}
 	vacationLines, away := vacationStatus(l, vacations, guildToday(g, b.now()))
 	you, paused := l.T("status.you_paused"), true
@@ -456,11 +482,9 @@ func (b *Bot) cmdStatus(ctx context.Context, i *discordgo.InteractionCreate, l *
 			you = l.T("status.you_receiving")
 		}
 	}
-	discordAdmin := i.Member != nil && i.Member.Permissions&discordgo.PermissionAdministrator != 0
-	level, err := b.api.Access(ctx, i.GuildID, user.ID, discordAdmin)
+	level, err := b.api.Access(ctx, g.DiscordID, user.ID, discordAdmin)
 	settings := err == nil && accessRank(level) >= accessRank(api.AccessView)
-	b.respond(i, discordgo.InteractionResponseChannelMessageWithSource,
-		b.statusMessage(l, g, you, b.surveyOffLine(l, g), vacationLines, paused, settings, len(recipients)))
+	return b.statusMessage(l, g, you, b.surveyOffLine(l, g), vacationLines, paused, settings, len(recipients)), nil
 }
 
 // statusMessage is /happyx status: where the member stands, what admins see of their answers,
@@ -694,6 +718,11 @@ func (b *Bot) ephemeral(i *discordgo.InteractionCreate, content string) {
 }
 
 func (b *Bot) replyError(i *discordgo.InteractionCreate, l *i18n.Locale, err error) {
+	b.ephemeral(i, b.errorText(l, err))
+}
+
+// errorText is what a failed interaction tells the user.
+func (b *Bot) errorText(l *i18n.Locale, err error) string {
 	var apiErr *api.Error
 	msg := l.T("error.generic")
 	switch {
@@ -708,7 +737,7 @@ func (b *Bot) replyError(i *discordgo.InteractionCreate, l *i18n.Locale, err err
 	default:
 		b.log.Error("interaction failed", "err", err)
 	}
-	b.ephemeral(i, msg)
+	return msg
 }
 
 func yesNo(l *i18n.Locale, v bool) string {

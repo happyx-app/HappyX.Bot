@@ -382,8 +382,9 @@ func (b *Bot) tick(ctx context.Context) {
 	}
 }
 
-// delivery counts the DMs of one send: who it went to and how many failed.
-type delivery struct{ recipients, failed int }
+// delivery counts the DMs of one send: who it went to, how many failed, and how many of those
+// because the person has DMs closed.
+type delivery struct{ recipients, failed, closed int }
 
 const (
 	// skipDone is how long the scheduler stops claiming a period that is already sent. The
@@ -457,13 +458,39 @@ func (b *Bot) sendSurvey(ctx context.Context, g api.Guild, day string) (delivery
 	}
 	l := i18n.Get(g.Language)
 	icon := b.guildIcon(g.DiscordID)
-	return b.dmEach(g, members, func(m api.Member) *discordgo.MessageSend {
+	guess := b.claimGuess(ctx, g) // on Thursday the game's guessing rides on the survey
+	withGuess, reached := map[string]bool{}, 0
+	d, err := b.dmEach(g, members, func(m api.Member) *discordgo.MessageSend {
 		to := surveyRecipient{ID: m.DiscordID, Name: b.displayName(g.DiscordID, m), Streak: m.Streak}
 		if m.PolicyPending {
 			to.PolicyURL = b.policyURL()
 		}
-		return surveyMessage(l, g, day, to, icon)
-	}, func(sent *discordgo.Message) { b.closeOldSurveys(l, g, sent) }, "survey")
+		msg := surveyMessage(l, g, day, to, icon)
+		if guess != nil && guess.plays(m.DiscordID) {
+			withGuess[m.DiscordID] = true
+			msg = withGame(l, g, msg, guess)
+		}
+		return msg
+	}, func(m api.Member, sent *discordgo.Message) {
+		if withGuess[m.DiscordID] {
+			reached++
+		}
+		b.closeOldSurveys(l, g, sent)
+	}, "survey")
+	if d.closed > 0 {
+		b.ensureSurveyPost(ctx, g)
+	}
+	if guess != nil {
+		if err != nil && d.failed == d.recipients {
+			// Nobody got the survey: the game's own DM goes out instead.
+			if rerr := b.api.ReleaseDispatch(ctx, g.DiscordID, "game_guess", guess.week); rerr != nil {
+				b.log.Warn("release game guess", "guild", g.DiscordID, "err", rerr)
+			}
+		} else {
+			b.sendGuessDMs(ctx, g, guess, withGuess, len(withGuess)-reached)
+		}
+	}
+	return d, err
 }
 
 // oldSurveysChecked is how many messages before today's survey are looked at for earlier ones
@@ -485,11 +512,17 @@ func (b *Bot) closeOldSurveys(l *i18n.Locale, g api.Guild, today *discordgo.Mess
 		if !ok || day >= surveyDay(today, g.DiscordID) {
 			continue
 		}
-		edit := &discordgo.MessageEdit{Channel: m.ChannelID, ID: m.ID, Components: &[]discordgo.MessageComponent{}}
+		// The game's line and button stay: guessing lasts until Sunday.
+		game := carriedGame(m)
+		components := []discordgo.MessageComponent{}
+		if len(game.row) > 0 {
+			components = append(components, discordgo.ActionsRow{Components: game.row})
+		}
+		edit := &discordgo.MessageEdit{Channel: m.ChannelID, ID: m.ID, Components: &components}
 		if !answered || changingAnswer(m) {
 			// A survey left at «Change answer» shows the question, not the answer: it closes
 			// like an unanswered one, though the answer given stays saved.
-			embeds := []*discordgo.MessageEmbed{closedEmbed(l, g.Name, day)}
+			embeds := append([]*discordgo.MessageEmbed{closedEmbed(l, g.Name, day)}, game.embeds...)
 			empty := ""
 			edit.Embeds, edit.Content = &embeds, &empty
 		}

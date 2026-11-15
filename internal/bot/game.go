@@ -122,9 +122,9 @@ func (b *Bot) dmAll(g api.Guild, members []api.Member, msg *discordgo.MessageSen
 	return b.dmEach(g, members, func(api.Member) *discordgo.MessageSend { return msg }, nil, what)
 }
 
-// dmEach is dmAll with a message built for each member.
-// dmEach sends msg to each member by DM and, when after is set, calls it with each DM sent.
-func (b *Bot) dmEach(g api.Guild, members []api.Member, msg func(api.Member) *discordgo.MessageSend, after func(sent *discordgo.Message), what string) (delivery, error) {
+// dmEach is dmAll with a message built for each member: it sends msg to each member by DM and,
+// when after is set, calls it with each DM sent.
+func (b *Bot) dmEach(g api.Guild, members []api.Member, msg func(api.Member) *discordgo.MessageSend, after func(m api.Member, sent *discordgo.Message), what string) (delivery, error) {
 	d := delivery{recipients: len(members)}
 	for _, m := range members {
 		sent, err := b.dmMessage(m.DiscordID, msg(m))
@@ -132,10 +132,13 @@ func (b *Bot) dmEach(g api.Guild, members []api.Member, msg func(api.Member) *di
 			// Usually the user has DMs from server members turned off.
 			b.log.Warn(what+" DM failed", "guild", g.DiscordID, "user", m.DiscordID, "err", err)
 			d.failed++
+			if closedDMs(err) {
+				d.closed++
+			}
 			continue
 		}
 		if after != nil {
-			after(sent)
+			after(m, sent)
 		}
 	}
 	if d.failed > 0 && d.failed == len(members) {

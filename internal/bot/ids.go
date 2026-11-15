@@ -59,7 +59,7 @@ func parseSurveyID(v string) (surveyID, bool) {
 		if mood < 1 || mood > 5 {
 			return surveyID{}, false
 		}
-	case actionStop, actionOptions, actionVacation, actionVacModal, actionPause, actionPauseOK, actionCancel, actionResume:
+	case actionStop, actionOptions, actionVacation, actionVacModal, actionPause, actionPauseOK, actionCancel, actionResume, actionAnswer:
 		if mood != 0 {
 			return surveyID{}, false
 		}

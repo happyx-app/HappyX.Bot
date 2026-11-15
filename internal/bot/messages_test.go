@@ -462,10 +462,18 @@ func TestSurveyMessage(t *testing.T) {
 	}
 }
 
+// /happyx shows in servers and in a DM with the bot; the kudos menu only in servers.
+func TestCommandContexts(t *testing.T) {
+	c := commands()[0]
+	if c.Contexts == nil || len(*c.Contexts) != 2 || (*c.Contexts)[1] != discordgo.InteractionContextBotDM {
+		t.Fatalf("/happyx contexts: %v", c.Contexts)
+	}
+}
+
 func TestKudosMenu(t *testing.T) {
 	types := map[discordgo.ApplicationCommandType]bool{}
 	for _, c := range commands()[1:] {
-		if c.Name != menuKudos || c.DMPermission == nil || *c.DMPermission {
+		if c.Name != menuKudos || c.Contexts == nil || len(*c.Contexts) != 1 || (*c.Contexts)[0] != discordgo.InteractionContextGuild {
 			t.Fatalf("menu command: %+v", c)
 		}
 		types[c.Type] = true

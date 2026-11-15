@@ -35,6 +35,9 @@ type surveyRecipient struct {
 	// PolicyURL is the privacy policy, set until they first answer since its date (the API's
 	// policy_pending): the survey then carries a link button to it.
 	PolicyURL string
+	// Yesterday is set when the survey shown is yesterday's, still open: after midnight its
+	// question asks about yesterday, not today.
+	Yesterday bool
 }
 
 // surveyColor is HappyX's violet, the colour of the survey card until it's answered.
@@ -112,10 +115,19 @@ func answeredQuote(m *discordgo.Message) string {
 		return ""
 	}
 	d := m.Embeds[0].Description
-	if i := strings.Index(d, "\n> "); i >= 0 {
-		return d[i+1:]
+	i := strings.Index(d, "\n> ")
+	if i < 0 {
+		return ""
 	}
-	return ""
+	// The quote's lines all start with "> "; whatever follows them, like «Your week», isn't it.
+	var lines []string
+	for _, line := range strings.Split(d[i+1:], "\n") {
+		if !strings.HasPrefix(line, "> ") {
+			break
+		}
+		lines = append(lines, line)
+	}
+	return strings.Join(lines, "\n")
 }
 
 // noButtons keeps a message as it is but takes its buttons away.
@@ -150,7 +162,11 @@ var surveyVar = regexp.MustCompile(`\{\{\s*([a-z.]+)\s*\}\}`)
 // unknown one is left as written.
 func surveyText(l *i18n.Locale, g api.Guild, day string, to surveyRecipient) string {
 	if strings.TrimSpace(g.SurveyMessage) == "" {
-		return "### " + l.T("survey.greeting", "name", to.Name) + "\n" + l.T("survey.question")
+		question := l.T("survey.question")
+		if to.Yesterday {
+			question = l.T("survey.question_yesterday")
+		}
+		return "### " + l.T("survey.greeting", "name", to.Name) + "\n" + question
 	}
 	d := parseDay(day)
 	vars := map[string]string{

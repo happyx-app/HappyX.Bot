@@ -91,7 +91,11 @@ func (b *Bot) handleOptions(ctx context.Context, i *discordgo.InteractionCreate,
 	user := interactionUser(i)
 	switch id.Action {
 	case actionOptions:
-		b.respond(i, discordgo.InteractionResponseChannelMessageWithSource, b.optionsMessage(l, g, id.Day, i.Message.ID))
+		msg := i.Message.ID
+		if i.Message.Flags&discordgo.MessageFlagsEphemeral != 0 {
+			msg = "" // a survey answered from the channel: only the one in the DM can be paused
+		}
+		b.respond(i, discordgo.InteractionResponseChannelMessageWithSource, b.optionsMessage(l, g, id.Day, msg))
 	case actionCancel:
 		data := b.optionsMessage(l, g, id.Day, id.Msg)
 		data.Flags = 0 // updating the ephemeral message keeps it ephemeral
@@ -104,7 +108,8 @@ func (b *Bot) handleOptions(ctx context.Context, i *discordgo.InteractionCreate,
 			return
 		}
 		content := l.T("options.paused_cmd", "guild", g.Name, "resume_cmd", b.resumeMention())
-		if id.Msg != "" && surveyOpen(g, id.Day, b.now()) {
+		switch {
+		case id.Msg != "" && surveyOpen(g, id.Day, b.now()):
 			// The survey card turns into the paused one, which can bring the survey back. An
 			// older card, closed since the options were opened, stays as it is.
 			if _, err := b.dg.ChannelMessageEditComplex(pausedEdit(l, g, id.Day, i.ChannelID, id.Msg)); err != nil {
@@ -112,22 +117,33 @@ func (b *Bot) handleOptions(ctx context.Context, i *discordgo.InteractionCreate,
 			} else {
 				content = l.T("options.paused", "guild", g.Name)
 			}
+		case id.Msg == "":
+			// From /happyx status or a survey answered in the channel: the open survey in the
+			// DM, if there is one, turns into the paused card all the same.
+			if b.syncSurveyCard(l, g, user, true) {
+				content = l.T("options.paused", "guild", g.Name)
+			}
 		}
 		b.respond(i, discordgo.InteractionResponseUpdateMessage, &discordgo.InteractionResponseData{
 			Content: content, Components: []discordgo.MessageComponent{}, AllowedMentions: &discordgo.MessageAllowedMentions{},
 		})
 	case actionResume:
-		if err := b.resume(ctx, id.GuildID, user); err != nil {
+		ended, err := b.resume(ctx, g, user)
+		if err != nil {
 			b.replyError(i, l, err)
 			return
 		}
 		if i.Message != nil && i.Message.Flags&discordgo.MessageFlagsEphemeral == 0 {
 			// The paused survey card: today's survey comes back to be answered.
 			b.respond(i, discordgo.InteractionResponseUpdateMessage, b.resumedSurvey(l, g, id.Day, user))
+			if ended != nil {
+				b.followUp(i, vacationEndedText(l, g.Name, *ended))
+			}
 			return
 		}
+		b.syncSurveyCard(l, g, user, false)
 		b.respond(i, discordgo.InteractionResponseUpdateMessage, &discordgo.InteractionResponseData{
-			Content: l.T("resume.done", "guild", g.Name), Components: []discordgo.MessageComponent{}, AllowedMentions: &discordgo.MessageAllowedMentions{},
+			Content: resumedText(l, g.Name, ended), Components: []discordgo.MessageComponent{}, AllowedMentions: &discordgo.MessageAllowedMentions{},
 		})
 	case actionVacation:
 		b.respond(i, discordgo.InteractionResponseModal, vacationModal(l, id))
@@ -146,19 +162,6 @@ func pauseConfirm(l *i18n.Locale, g api.Guild, id surveyID) *discordgo.Interacti
 		}}},
 		AllowedMentions: &discordgo.MessageAllowedMentions{},
 	}
-}
-
-// resume makes the member get the guild's survey again. Coming back also ends a vacation; an
-// API from before vacations answers 404.
-func (b *Bot) resume(ctx context.Context, guildID string, user *discordgo.User) error {
-	yes := true
-	if err := b.api.UpsertMember(ctx, guildID, user.ID, user.Username, &yes); err != nil {
-		return err
-	}
-	if err := b.api.EndVacations(ctx, guildID, user.ID); err != nil && !errors.Is(err, api.ErrNotFound) {
-		return err
-	}
-	return nil
 }
 
 // pausedEdit turns a survey card into the paused one, with a button to get the survey again.
@@ -193,8 +196,14 @@ func (b *Bot) resumedSurvey(l *i18n.Locale, g api.Guild, day string, user *disco
 			AllowedMentions: &discordgo.MessageAllowedMentions{},
 		}
 	}
-	msg := surveyMessage(l, g, day, surveyRecipient{ID: user.ID, Name: b.userName(g.DiscordID, user)}, b.guildIcon(g.DiscordID))
+	msg := surveyMessage(l, g, day, surveyRecipient{ID: user.ID, Name: b.userName(g.DiscordID, user), Yesterday: b.yesterday(g, day)}, b.guildIcon(g.DiscordID))
 	return &discordgo.InteractionResponseData{Embeds: msg.Embeds, Components: msg.Components, AllowedMentions: msg.AllowedMentions}
+}
+
+// yesterday reports whether day is before today in g's timezone: a survey still open after
+// midnight.
+func (b *Bot) yesterday(g api.Guild, day string) bool {
+	return day < guildToday(g, b.now()).Format(isoDate)
 }
 
 // surveyOpen reports whether day's survey can still be answered: today's and yesterday's, as

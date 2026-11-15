@@ -699,3 +699,49 @@ func (c *Client) VacationNotices(ctx context.Context) ([]VacationNotice, error) 
 func (c *Client) DoneVacationNotice(ctx context.Context, id int64) error {
 	return c.do(ctx, http.MethodDelete, "/v1/vacation-notices/"+strconv.FormatInt(id, 10), nil, nil)
 }
+
+// MemberMoods is the member's own answers in the guild from from to to (YYYY-MM-DD, at most 31
+// days), oldest first, to show only to them.
+func (c *Client) MemberMoods(ctx context.Context, guildID, userID, from, to string) ([]MoodEntry, error) {
+	var out []MoodEntry
+	err := c.do(ctx, http.MethodGet, memberPath(guildID, userID)+"/moods?"+url.Values{"from": {from}, "to": {to}}.Encode(), nil, &out)
+	return out, err
+}
+
+// UserGuilds is the active servers the user is in, whether or not they get the survey there.
+func (c *Client) UserGuilds(ctx context.Context, userID string) ([]Guild, error) {
+	var out []Guild
+	err := c.do(ctx, http.MethodGet, "/v1/users/"+url.PathEscape(userID)+"/guilds", nil, &out)
+	return out, err
+}
+
+// ChannelPost is where the bot keeps one of its messages in a channel.
+type ChannelPost struct {
+	Kind      string `json:"kind"`
+	ChannelID string `json:"channel_id"`
+	MessageID string `json:"message_id"`
+}
+
+// PostSurvey is the kind of the daily survey's message for whoever doesn't get HappyX's DMs.
+const PostSurvey = "survey"
+
+// ChannelPost fails with ErrNotFound when the guild has no post of that kind.
+func (c *Client) ChannelPost(ctx context.Context, guildID, kind string) (ChannelPost, error) {
+	var out ChannelPost
+	err := c.do(ctx, http.MethodGet, channelPostPath(guildID, kind), nil, &out)
+	return out, err
+}
+
+// PutChannelPost records where the bot has just published the guild's post of that kind.
+func (c *Client) PutChannelPost(ctx context.Context, guildID, kind, channelID, messageID string) error {
+	return c.do(ctx, http.MethodPut, channelPostPath(guildID, kind), map[string]string{"channel_id": channelID, "message_id": messageID}, nil)
+}
+
+// DeleteChannelPost forgets the guild's post of that kind.
+func (c *Client) DeleteChannelPost(ctx context.Context, guildID, kind string) error {
+	return c.do(ctx, http.MethodDelete, channelPostPath(guildID, kind), nil, nil)
+}
+
+func channelPostPath(guildID, kind string) string {
+	return "/v1/guilds/" + url.PathEscape(guildID) + "/channel-posts/" + url.PathEscape(kind)
+}

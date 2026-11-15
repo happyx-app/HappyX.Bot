@@ -14,24 +14,40 @@ const (
 	actionMood      = "mood"      // button: record the mood
 	actionNote      = "note"      // button: open the comment modal
 	actionNoteModal = "notemodal" // modal submit: record mood + comment
-	actionStop      = "stop"      // button: stop getting this guild's survey (Mood is 0)
+	actionChange    = "change"    // button on the answer: show the faces again (Mood is the current one)
+	actionRemood    = "remood"    // button on the faces shown by «change»: record the new mood
+	actionStop      = "stop"      // button on surveys sent before «Options»: stop getting this guild's survey
+	actionOptions   = "opts"      // button: the member's options for this guild's survey
+	actionVacation  = "vac"       // button: open the vacation modal
+	actionVacModal  = "vacmodal"  // modal submit: set the vacation
+	actionPause     = "pause"     // button: ask to confirm the pause
+	actionPauseOK   = "pauseok"   // button: pause this guild's survey
+	actionCancel    = "cancel"    // button: back to the options
+	actionResume    = "resume"    // button on a paused survey: get it again
 	idPrefix        = "hx"
 )
 
+// surveyID is the custom ID of the survey's components. Msg, when set, is the survey message
+// that an options button acts on: the options are an ephemeral reply, a message of their own.
 type surveyID struct {
 	Action  string
 	GuildID string
 	Day     string
 	Mood    int
+	Msg     string
 }
 
 func (s surveyID) String() string {
-	return fmt.Sprintf("%s:%s:%s:%s:%d", idPrefix, s.Action, s.GuildID, s.Day, s.Mood)
+	id := fmt.Sprintf("%s:%s:%s:%s:%d", idPrefix, s.Action, s.GuildID, s.Day, s.Mood)
+	if s.Msg != "" {
+		id += ":" + s.Msg
+	}
+	return id
 }
 
 func parseSurveyID(v string) (surveyID, bool) {
 	p := strings.Split(v, ":")
-	if len(p) != 5 || p[0] != idPrefix {
+	if (len(p) != 5 && len(p) != 6) || p[0] != idPrefix {
 		return surveyID{}, false
 	}
 	mood, err := strconv.Atoi(p[4])
@@ -39,18 +55,25 @@ func parseSurveyID(v string) (surveyID, bool) {
 		return surveyID{}, false
 	}
 	switch p[1] {
-	case actionMood, actionNote, actionNoteModal:
+	case actionMood, actionRemood, actionNote, actionNoteModal, actionChange:
 		if mood < 1 || mood > 5 {
 			return surveyID{}, false
 		}
-	case actionStop:
+	case actionStop, actionOptions, actionVacation, actionVacModal, actionPause, actionPauseOK, actionCancel, actionResume:
 		if mood != 0 {
 			return surveyID{}, false
 		}
 	default:
 		return surveyID{}, false
 	}
-	return surveyID{Action: p[1], GuildID: p[2], Day: p[3], Mood: mood}, true
+	id := surveyID{Action: p[1], GuildID: p[2], Day: p[3], Mood: mood}
+	if len(p) == 6 {
+		if !snowflake(p[5]) {
+			return surveyID{}, false
+		}
+		id.Msg = p[5]
+	}
+	return id, true
 }
 
 // kudosID is the custom ID of the modal opened by "Give kudos" in the right-click menu. It

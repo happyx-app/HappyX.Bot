@@ -249,15 +249,28 @@ func (b *Bot) handleSurveyButton(ctx context.Context, i *discordgo.InteractionCr
 	g, l := b.guildAndLocale(ctx, id.GuildID)
 	user := interactionUser(i)
 	switch id.Action {
-	case actionMood:
-		if err := b.api.RecordMood(ctx, id.GuildID, user.ID, id.Day, id.Mood, ""); err != nil {
-			b.replyError(i, l, err)
+	case actionMood, actionRemood:
+		// Changing the mood keeps a comment given earlier that day.
+		e, err := b.api.ChangeMood(ctx, id.GuildID, user.ID, id.Day, id.Mood)
+		if err != nil {
+			b.surveyError(i, l, g, id, err)
 			return
 		}
-		b.respond(i, discordgo.InteractionResponseUpdateMessage, answeredMessage(l, g, id, b.userName(id.GuildID, user), ""))
-	case actionNote:
-		b.respond(i, discordgo.InteractionResponseModal, noteModal(l, id))
-	case actionStop:
+		id.Action = actionMood
+		b.respond(i, discordgo.InteractionResponseUpdateMessage, answeredMessage(l, g, id, b.userName(id.GuildID, user), e.Message))
+	case actionChange, actionNote:
+		if !surveyOpen(g, id.Day, b.now()) {
+			// An answer from a day that can't be changed any more keeps what it shows.
+			b.respond(i, discordgo.InteractionResponseUpdateMessage, noButtons())
+			return
+		}
+		if id.Action == actionNote {
+			b.respond(i, discordgo.InteractionResponseModal, noteModal(l, g, id))
+			return
+		}
+		to := surveyRecipient{ID: user.ID, Name: b.userName(id.GuildID, user)}
+		b.respond(i, discordgo.InteractionResponseUpdateMessage, changeMessage(l, g, id.Day, to, b.guildIcon(id.GuildID), answeredQuote(i.Message)))
+	case actionStop: // surveys sent before «Options» still have this button
 		err := b.api.RemoveMember(ctx, id.GuildID, user.ID)
 		if err != nil && !errors.Is(err, api.ErrNotFound) {
 			b.replyError(i, l, err)
@@ -268,20 +281,48 @@ func (b *Bot) handleSurveyButton(ctx context.Context, i *discordgo.InteractionCr
 			Embeds:     []*discordgo.MessageEmbed{},
 			Components: []discordgo.MessageComponent{},
 		})
+	default:
+		b.handleOptions(ctx, i, id, g, l)
 	}
+}
+
+// surveyError answers a failed survey answer. A survey too old to answer turns into the
+// closed card, which is what it should have been already.
+func (b *Bot) surveyError(i *discordgo.InteractionCreate, l *i18n.Locale, g api.Guild, id surveyID, err error) {
+	if api.TooOld(err) {
+		switch id.Action {
+		case actionNoteModal:
+			// The day closed while the comment was being written: say so, with the comment,
+			// rather than drop it.
+			b.ephemeral(i, l.T("survey.note_too_late", "comment", quote(modalValue(i.ModalSubmitData(), "comment"))))
+		case actionRemood:
+			b.respond(i, discordgo.InteractionResponseUpdateMessage, noButtons())
+		default:
+			b.respond(i, discordgo.InteractionResponseUpdateMessage, closedSurvey(l, g, id.Day))
+		}
+		return
+	}
+	b.replyError(i, l, err)
 }
 
 func (b *Bot) handleNoteModal(ctx context.Context, i *discordgo.InteractionCreate) {
 	data := i.ModalSubmitData()
 	id, ok := parseSurveyID(data.CustomID)
-	if !ok || id.Action != actionNoteModal {
+	if !ok {
+		return
+	}
+	if id.Action == actionVacModal {
+		b.handleVacationModal(ctx, i, id, data)
+		return
+	}
+	if id.Action != actionNoteModal {
 		return
 	}
 	g, l := b.guildAndLocale(ctx, id.GuildID)
 	comment := modalValue(data, "comment")
 	user := interactionUser(i)
-	if err := b.api.RecordMood(ctx, id.GuildID, user.ID, id.Day, id.Mood, comment); err != nil {
-		b.replyError(i, l, err)
+	if _, err := b.api.RecordMood(ctx, id.GuildID, user.ID, id.Day, id.Mood, comment); err != nil {
+		b.surveyError(i, l, g, id, err)
 		return
 	}
 	b.respond(i, discordgo.InteractionResponseUpdateMessage, answeredMessage(l, g, id, b.userName(id.GuildID, user), comment))
@@ -327,17 +368,19 @@ func (b *Bot) handleCommand(ctx context.Context, i *discordgo.InteractionCreate)
 		}
 		b.ephemeral(i, l.T("pause.done", "resume_cmd", b.resumeMention()))
 	case cmdResume:
-		yes := true
-		if err := b.api.UpsertMember(ctx, i.GuildID, user.ID, user.Username, &yes); err != nil {
+		if err := b.resume(ctx, i.GuildID, user); err != nil {
 			b.replyError(i, l, err)
 			return
 		}
-		// Coming back also ends a vacation. An API from before vacations answers 404.
-		if err := b.api.EndVacations(ctx, i.GuildID, user.ID); err != nil && !errors.Is(err, api.ErrNotFound) {
-			b.replyError(i, l, err)
+		g, _ := b.guildAndLocale(ctx, i.GuildID)
+		if g.Name == "" {
+			g.Name = b.guildName(i.GuildID)
+		}
+		if g.Name == "" {
+			b.ephemeral(i, l.T("resume.done_here"))
 			return
 		}
-		b.ephemeral(i, l.T("resume.done"))
+		b.ephemeral(i, l.T("resume.done", "guild", g.Name))
 	case cmdVacation:
 		b.cmdVacation(ctx, i, l, user, sub.Options)
 	case cmdConfig:
@@ -351,6 +394,9 @@ func (b *Bot) handleCommand(ctx context.Context, i *discordgo.InteractionCreate)
 	}
 }
 
+// cmdStatus tells members where they stand with this server's survey, with the same options as
+// the survey's: vacation, pause or resume, and their evolution. Whoever can see the reports also
+// gets the server's settings.
 func (b *Bot) cmdStatus(ctx context.Context, i *discordgo.InteractionCreate, l *i18n.Locale, user *discordgo.User) {
 	g, err := b.api.Guild(ctx, i.GuildID)
 	if err != nil {
@@ -373,26 +419,52 @@ func (b *Bot) cmdStatus(ctx context.Context, i *discordgo.InteractionCreate, l *
 		return
 	}
 	vacationLines, away := vacationStatus(l, vacations, guildToday(g, b.now()))
-	you := l.T("status.paused")
+	you, paused := l.T("status.you_paused"), true
 	for _, m := range members {
 		if m.DiscordID == user.ID {
-			you = l.T("status.not_your_role") // opted in, but the survey roles leave them out
+			paused = false
+			you = l.T("status.you_not_your_role") // opted in, but the survey roles leave them out
 			if away {
-				you = l.T("status.on_vacation") // the survey list leaves them out today
+				you = l.T("status.you_on_vacation") // the survey list leaves them out today
 			}
 		}
 	}
 	for _, m := range recipients {
 		if m.DiscordID == user.ID {
-			you = l.T("status.receiving")
+			you = l.T("status.you_receiving")
 		}
 	}
-	text := l.T("status.text",
-		"days", workingDaysText(l, g.WorkingDays), "hour", fmt.Sprintf("%02d", g.SurveyHour), "timezone", g.Timezone,
-		"frequency", l.T("freq."+g.ReportFrequency), "admin", "<@"+g.AdminDiscordID+">",
-		"anonymous", yesNo(l, g.Anonymous), "language", i18n.Get(g.Language).Name,
-		"participants", len(recipients), "you", you)
-	b.ephemeral(i, afterFirstLine(text, b.surveyOffLine(l, g))+vacationLines+reportDMLine(l, g)+"\n"+kudosChannelLine(l, g)+"\n"+gameLine(l, g))
+	discordAdmin := i.Member != nil && i.Member.Permissions&discordgo.PermissionAdministrator != 0
+	level, err := b.api.Access(ctx, i.GuildID, user.ID, discordAdmin)
+	settings := err == nil && accessRank(level) >= accessRank(api.AccessView)
+	b.respond(i, discordgo.InteractionResponseChannelMessageWithSource,
+		b.statusMessage(l, g, you, b.surveyOffLine(l, g), vacationLines, paused, settings, len(recipients)))
+}
+
+// statusMessage is /happyx status: where the member stands, what admins see of their answers,
+// their vacations and, for whoever can see the reports, the server's settings.
+func (b *Bot) statusMessage(l *i18n.Locale, g api.Guild, you, offLine, vacationLines string, paused, settings bool, participants int) *discordgo.InteractionResponseData {
+	schedule := surveySchedule(l, g)
+	if paused {
+		schedule = "" // it doesn't come on those days now
+	}
+	text := strings.TrimSpace(l.T("status.text", "guild", g.Name, "you", you, "schedule", schedule))
+	if offLine != "" {
+		text += "\n" + offLine
+	}
+	text += "\n" + privacyLine(l, g) + vacationLines
+	if settings {
+		text += "\n\n" + l.T("status.settings",
+			"frequency", l.T("freq."+g.ReportFrequency), "admin", "<@"+g.AdminDiscordID+">",
+			"language", i18n.Get(g.Language).Name, "participants", participants) +
+			reportDMLine(l, g) + "\n" + kudosChannelLine(l, g) + "\n" + gameLine(l, g)
+	}
+	return &discordgo.InteractionResponseData{
+		Content:         text,
+		Components:      b.optionsButtons(l, g, guildToday(g, b.now()).Format(isoDate), "", paused),
+		Flags:           discordgo.MessageFlagsEphemeral,
+		AllowedMentions: &discordgo.MessageAllowedMentions{},
+	}
 }
 
 func (b *Bot) cmdConfig(ctx context.Context, i *discordgo.InteractionCreate, l *i18n.Locale, user *discordgo.User, opts []*discordgo.ApplicationCommandInteractionDataOption) {
@@ -416,7 +488,11 @@ func (b *Bot) cmdConfig(ctx context.Context, i *discordgo.InteractionCreate, l *
 			v := int(o.IntValue())
 			p.SurveyHour = &v
 		case optTimezone:
-			v := o.StringValue()
+			v := strings.TrimSpace(o.StringValue())
+			if _, err := time.LoadLocation(v); err != nil || v == "" || strings.EqualFold(v, "local") {
+				b.ephemeral(i, l.T("config.bad_timezone", "timezone", v))
+				return
+			}
 			p.Timezone = &v
 		case optFrequency:
 			v := o.StringValue()
@@ -564,7 +640,9 @@ func (b *Bot) replyError(i *discordgo.InteractionCreate, l *i18n.Locale, err err
 	case errors.Is(err, api.ErrConflict):
 		msg = l.T("error.inactive")
 	case errors.As(err, &apiErr) && apiErr.Status == 400:
-		msg = l.T("error.invalid", "detail", apiErr.Message)
+		// The API's reason is in English and for developers: logged, not shown.
+		b.log.Warn("interaction refused by the API", "err", err)
+		msg = l.T("error.invalid")
 	default:
 		b.log.Error("interaction failed", "err", err)
 	}

@@ -40,7 +40,9 @@ func Previews(code string) []Preview {
 	g := api.Guild{DiscordID: PreviewGuildID, Name: "Equipo Demo", AdminDiscordID: PreviewAdminID, Anonymous: true,
 		Timezone: "Europe/Madrid", SurveyHour: 13, ReportFrequency: "weekly", Language: code, KudosChannelID: PreviewChannelID,
 		WorkingDays: presetDays("mon_fri")}
-	b := &Bot{}
+	b := &Bot{webURL: "https://happyx.example.com", now: func() time.Time { return time.Date(2026, 10, 23, 12, 0, 0, 0, time.UTC) }}
+	cmdID := "900000000000000001" // as once the commands are registered: mentions are clickable
+	b.commandID.Store(&cmdID)
 	public, no := g, false
 	public.Anonymous = false
 	sunToThu := g
@@ -75,8 +77,19 @@ func Previews(code string) []Preview {
 		{Title: "Daily survey", Channel: "DM", Msg: surveyMessage(l, g, day, ana, PreviewGuildIcon)},
 		{Title: "Daily survey with the admin's own message", Channel: "DM", Msg: surveyMessage(l, custom, day, ana, PreviewGuildIcon)},
 		{Title: "Daily survey until the first answer since the privacy policy's date", Channel: "DM", Msg: surveyMessage(l, g, day, anaFirst, PreviewGuildIcon)},
+		{Title: "Options (from the survey)", Channel: "DM", Ephemeral: true, Msg: data(b.optionsMessage(l, g, day, "1"))},
+		{Title: "Options › Pause", Channel: "DM", Ephemeral: true, Msg: data(pauseConfirm(l, g, surveyID{Action: actionPause, GuildID: g.DiscordID, Day: day, Msg: "1"}))},
+		{Title: "Paused survey (replaces the card)", Channel: "DM", Msg: previewPaused(l, g, day)},
+		{Title: "Paused (the options' reply)", Channel: "DM", Ephemeral: true, Msg: text(l.T("options.paused", "guild", g.Name))},
+		{Title: "Vacation set from the options", Channel: "DM", Ephemeral: true,
+			Msg: text(l.T("vacation.done", "from", discordDate("2026-12-20"), "to", discordDate("2027-01-06"), "resume_cmd", b.resumeMention()))},
+		{Title: "Yesterday's survey, unanswered, once today's arrives", Channel: "DM", Msg: data(closedSurvey(l, g, "2026-10-22"))},
 		{Title: "After answering", Channel: "DM", Msg: data(answered)},
 		{Title: "After adding a comment", Channel: "DM", Msg: data(commented)},
+		{Title: "Change answer (the comment stays)", Channel: "DM",
+			Msg: data(changeMessage(l, g, day, ana, PreviewGuildIcon, answeredQuote(&discordgo.Message{Embeds: commented.Embeds})))},
+		{Title: "Yesterday's survey, answered, once today's arrives", Channel: "DM", Msg: &discordgo.MessageSend{Embeds: commented.Embeds}},
+		{Title: "Survey paused days ago, turned back on", Channel: "DM", Msg: data(b.resumedSurvey(l, g, "2026-10-12", &discordgo.User{ID: ana.ID, Username: "ana"}))},
 		{Title: "Kudos card", Channel: "#kudos", Command: "/happyx kudos", Msg: kudosCard(l, anaP, beaP, kudosMsg, nil)},
 		{Title: "Kudos card from a message (right-click › Apps)", Channel: "#kudos", Command: menuKudos,
 			Msg: kudosCard(l, anaP, beaP, kudosMsg, &kudosOrigin{ChannelID: PreviewGeneralID, Link: link})},
@@ -86,10 +99,12 @@ func Previews(code string) []Preview {
 		{Title: "Kudos to yourself", Channel: "#general", Command: "/happyx kudos", Ephemeral: true, Msg: text(l.T("kudos.no_self"))},
 		{Title: "Kudos to a bot", Channel: "#general", Command: "/happyx kudos", Ephemeral: true, Msg: text(l.T("kudos.no_bots"))},
 		{Title: "Kudos daily limit", Channel: "#general", Command: "/happyx kudos", Ephemeral: true, Msg: text(l.T("kudos.too_many"))},
-		{Title: "Status", Channel: "#general", Command: "/happyx status", Ephemeral: true, Msg: text(l.T("status.text",
-			"days", workingDaysText(l, g.WorkingDays), "hour", "13", "timezone", g.Timezone, "frequency", l.T("freq.weekly"), "admin", "<@"+PreviewAdminID+">",
-			"anonymous", yesNo(l, true), "language", l.Name, "participants", 12, "you", l.T("status.receiving")) +
-			"\n" + kudosChannelLine(l, g))},
+		{Title: "Status (a member)", Channel: "#general", Command: "/happyx status", Ephemeral: true,
+			Msg: data(b.statusMessage(l, g, l.T("status.you_receiving"), "", "", false, false, 12))},
+		{Title: "Status (paused)", Channel: "#general", Command: "/happyx status", Ephemeral: true,
+			Msg: data(b.statusMessage(l, g, l.T("status.you_paused"), "", "", true, false, 12))},
+		{Title: "Status (an admin)", Channel: "#general", Command: "/happyx status", Ephemeral: true,
+			Msg: data(b.statusMessage(l, g, l.T("status.you_receiving"), "", "", false, true, 12))},
 		{Title: "Changing the working days", Channel: "#general", Command: "/happyx config working_days:" + l.T("days.sun_thu"), Ephemeral: true,
 			Msg: text(configSaved(l, sunToThu, api.GuildPatch{WorkingDays: sunToThu.WorkingDays}))},
 		{Title: "Turning anonymity off", Channel: "#general", Command: "/happyx config anonymous:False", Ephemeral: true,
@@ -197,4 +212,10 @@ func previewReport() api.Report {
 		r.Days = append(r.Days, api.ReportDay{Day: fmt.Sprintf("2026-10-%d", 19+i), Average: avg, Responses: 8})
 	}
 	return r
+}
+
+// previewPaused is the survey card once paused.
+func previewPaused(l *i18n.Locale, g api.Guild, day string) *discordgo.MessageSend {
+	e := pausedEdit(l, g, day, "1", "1")
+	return &discordgo.MessageSend{Embeds: *e.Embeds, Components: *e.Components}
 }

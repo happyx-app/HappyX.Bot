@@ -27,10 +27,10 @@ func TestClientAgainstAPI(t *testing.T) {
 	if err := c.UpsertMember(ctx, g, u, "tester", nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.RecordMood(ctx, g, u, today, 4, "hola"); err != nil {
+	if _, err := c.RecordMood(ctx, g, u, today, 4, "hola"); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.RecordMood(ctx, g, "200000000000000078", today, 4, ""); !errors.Is(err, ErrForbidden) {
+	if _, err := c.RecordMood(ctx, g, "200000000000000078", today, 4, ""); !errors.Is(err, ErrForbidden) {
 		t.Fatalf("non-member answer: want ErrForbidden, got %v", err)
 	}
 	r, err := c.Report(ctx, g, today, today)

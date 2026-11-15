@@ -96,7 +96,6 @@ func (b *Bot) cmdVacation(ctx context.Context, i *discordgo.InteractionCreate, l
 		b.replyError(i, l, err)
 		return
 	}
-	today := guildToday(g, b.now())
 	var fromText, toText string
 	for _, o := range opts {
 		switch o.Name {
@@ -106,26 +105,34 @@ func (b *Bot) cmdVacation(ctx context.Context, i *discordgo.InteractionCreate, l
 			toText = o.StringValue()
 		}
 	}
-	from, ok := parseVacationDate(fromText, today)
-	if !ok {
-		b.ephemeral(i, l.T("vacation.bad_date", "date", fromText))
-		return
-	}
-	to, ok := parseVacationDate(toText, from)
-	if !ok {
-		b.ephemeral(i, l.T("vacation.bad_date", "date", toText))
-		return
-	}
-	if to.Before(from) || to.Before(today) || to.Sub(from) >= maxVacationDays*24*time.Hour || from.After(today.AddDate(0, 0, maxVacationLead)) {
-		b.ephemeral(i, l.T("vacation.invalid", "max", maxVacationDays))
-		return
-	}
-	v, err := b.api.SetVacation(ctx, i.GuildID, user.ID, from.Format(isoDate), to.Format(isoDate))
+	text, _, err := b.setVacation(ctx, g, l, user, fromText, toText)
 	if err != nil {
 		b.replyError(i, l, err)
 		return
 	}
-	b.ephemeral(i, l.T("vacation.done", "from", discordDate(v.From), "to", discordDate(v.To), "resume_cmd", b.resumeMention()))
+	b.ephemeral(i, text)
+}
+
+// setVacation reads the dates as typed and sets the member's vacation, for every server. It
+// returns the reply: the confirmation (ok), or what is wrong with the dates.
+func (b *Bot) setVacation(ctx context.Context, g api.Guild, l *i18n.Locale, user *discordgo.User, fromText, toText string) (text string, ok bool, err error) {
+	today := guildToday(g, b.now())
+	from, valid := parseVacationDate(fromText, today)
+	if !valid {
+		return l.T("vacation.bad_date", "date", fromText), false, nil
+	}
+	to, valid := parseVacationDate(toText, from)
+	if !valid {
+		return l.T("vacation.bad_date", "date", toText), false, nil
+	}
+	if to.Before(from) || to.Before(today) || to.Sub(from) >= maxVacationDays*24*time.Hour || from.After(today.AddDate(0, 0, maxVacationLead)) {
+		return l.T("vacation.invalid", "max", maxVacationDays), false, nil
+	}
+	v, err := b.api.SetVacation(ctx, g.DiscordID, user.ID, from.Format(isoDate), to.Format(isoDate))
+	if err != nil {
+		return "", false, err
+	}
+	return l.T("vacation.done", "from", discordDate(v.From), "to", discordDate(v.To), "resume_cmd", b.resumeMention()), true, nil
 }
 
 // vacationStatus is what /happyx status says about the member's vacations: the lines to add and

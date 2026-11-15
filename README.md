@@ -52,8 +52,13 @@ report. One bot serves any number of servers; their data is kept apart by
 - **Survey**: on the server's working days (Monday to Friday by default; `/happyx config working_days`
   offers common sets, the web any days), from the configured hour (default 13:00 Europe/Madrid) the bot DMs every active member
   a card (greeting, the anonymity notice, the server's icon) with five emoji buttons. After
-  answering, the card shows their mood, and they can add a comment. Answering again the same day replaces the answer.
-  A **Don't ask me again** button under the survey stops it for that server (same as `/happyx pause`).
+  answering, the card shows their mood, and they can add a comment (the form says who reads it) or
+  change the mood, which keeps the comment. A survey can be answered until the next one arrives:
+  then it turns into a grey card with just its day, and the answered ones lose their buttons, so
+  only today's is open in the DM (the API also refuses days before yesterday).
+  **Options** under the survey shows, only to that member, when it comes and what admins see of
+  the answers, with **Vacation** (a form, for every server), **Pause** (asks first; the card then
+  offers **Get it again**) and **My evolution** on the web.
   On vacation (`/happyx vacation`, or the web) nobody gets the survey or the game. An admin can set
   a member's vacation on the web if they forgot; the bot then tells them by DM, with a link to
   remove it.
@@ -90,7 +95,7 @@ report. One bot serves any number of servers; their data is kept apart by
 
 | Command | Who | What |
 | --- | --- | --- |
-| `/happyx status` | everyone | settings and whether you receive the survey |
+| `/happyx status` | everyone | whether you receive the survey, what admins see, your vacations, with the same buttons as the survey's **Options**; whoever can see the reports also gets the server's settings |
 | `/happyx pause` / `/happyx resume` | everyone | stop / resume receiving the survey in this server; resume also ends a vacation |
 | `/happyx vacation from to` | everyone | no survey or game from the first day to the last, in every server (dates day first: `20/12`, `20/12/2026` or `2026-12-20`; at most 90 days). Those days don't count against participation or the streak |
 | `/happyx kudos` | everyone | `user`, `message` (≤300): publicly thank a teammate |

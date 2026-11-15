@@ -92,7 +92,7 @@ func Render(l *i18n.Locale, guildName string, r api.Report) ([]byte, error) {
 	// Headline tiles
 	avg, avgNote, resp, people := "—", "", "0", "0"
 	if r.Responses > 0 {
-		avg = fmt.Sprintf("%.1f", r.Average)
+		avg = l.Decimal(r.Average)
 		avgNote = moodLabel(l, int(math.Round(r.Average)))
 		resp = fmt.Sprint(r.Responses)
 		people = fmt.Sprint(r.Respondents)

@@ -41,14 +41,7 @@ const surveyColor = 0x8b5cf6
 // surveyMessage is the daily survey: a card with the question (or the admin's own message), the
 // anonymity notice, and the mood buttons (just their emoji) below. icon is the server's icon, if any.
 func surveyMessage(l *i18n.Locale, g api.Guild, day string, to surveyRecipient, icon string) *discordgo.MessageSend {
-	buttons := make([]discordgo.MessageComponent, 0, len(moodEmojis))
-	for i, emoji := range moodEmojis {
-		buttons = append(buttons, discordgo.Button{
-			Emoji:    &discordgo.ComponentEmoji{Name: emoji},
-			Style:    discordgo.SecondaryButton,
-			CustomID: surveyID{Action: actionMood, GuildID: g.DiscordID, Day: day, Mood: i + 1}.String(),
-		})
-	}
+	buttons := moodButtons(g, day, actionMood)
 	privacy := l.T("survey.anonymous")
 	if !g.Anonymous {
 		privacy = l.T("survey.named")
@@ -64,10 +57,10 @@ func surveyMessage(l *i18n.Locale, g api.Guild, day string, to surveyRecipient, 
 	}
 	more := []discordgo.MessageComponent{
 		discordgo.Button{
-			Label:    l.T("survey.stop_button"),
-			Emoji:    &discordgo.ComponentEmoji{Name: "🔕"},
+			Label:    l.T("survey.options_button"),
+			Emoji:    &discordgo.ComponentEmoji{Name: "⚙️"},
 			Style:    discordgo.SecondaryButton,
-			CustomID: surveyID{Action: actionStop, GuildID: g.DiscordID, Day: day}.String(),
+			CustomID: surveyID{Action: actionOptions, GuildID: g.DiscordID, Day: day}.String(),
 		},
 	}
 	if to.PolicyURL != "" {
@@ -82,6 +75,53 @@ func surveyMessage(l *i18n.Locale, g api.Guild, day string, to surveyRecipient, 
 			discordgo.ActionsRow{Components: more},
 		},
 	}
+}
+
+// moodButtons are the five faces, just their emoji, recording the mood with action.
+func moodButtons(g api.Guild, day, action string) []discordgo.MessageComponent {
+	buttons := make([]discordgo.MessageComponent, 0, len(moodEmojis))
+	for i, emoji := range moodEmojis {
+		buttons = append(buttons, discordgo.Button{
+			Emoji:    &discordgo.ComponentEmoji{Name: emoji},
+			Style:    discordgo.SecondaryButton,
+			CustomID: surveyID{Action: action, GuildID: g.DiscordID, Day: day, Mood: i + 1}.String(),
+		})
+	}
+	return buttons
+}
+
+// changeMessage is what «Change answer» turns the answer into: the survey again, with the
+// comment quoted below the question, since choosing another face keeps it, and only the faces.
+// Those faces carry their own action so that, left unchosen, the card still counts as answered.
+func changeMessage(l *i18n.Locale, g api.Guild, day string, to surveyRecipient, icon, quoted string) *discordgo.InteractionResponseData {
+	msg := surveyMessage(l, g, day, to, icon)
+	if quoted != "" {
+		msg.Embeds[0].Description += "\n" + quoted
+	}
+	return &discordgo.InteractionResponseData{
+		Content:         "",
+		Embeds:          msg.Embeds,
+		Components:      []discordgo.MessageComponent{discordgo.ActionsRow{Components: moodButtons(g, day, actionRemood)}},
+		AllowedMentions: msg.AllowedMentions,
+	}
+}
+
+// answeredQuote is the comment quoted on an answer card from answeredMessage, as it is shown
+// there, or "" if the card has none.
+func answeredQuote(m *discordgo.Message) string {
+	if m == nil || len(m.Embeds) == 0 {
+		return ""
+	}
+	d := m.Embeds[0].Description
+	if i := strings.Index(d, "\n> "); i >= 0 {
+		return d[i+1:]
+	}
+	return ""
+}
+
+// noButtons keeps a message as it is but takes its buttons away.
+func noButtons() *discordgo.InteractionResponseData {
+	return &discordgo.InteractionResponseData{Components: []discordgo.MessageComponent{}}
 }
 
 var surveyVar = regexp.MustCompile(`\{\{\s*([a-z.]+)\s*\}\}`)
@@ -126,19 +166,22 @@ func longDate(l *i18n.Locale, d time.Time) string {
 		"month", l.List("date.months_long")[d.Month()-1])
 }
 
-// answeredMessage replaces the survey once answered: the mood in the card's colour and an offer
-// to add a comment.
+// answeredMessage replaces the survey once answered: the mood in the card's colour, the comment
+// if there is one, and buttons to add a comment or change the mood.
 func answeredMessage(l *i18n.Locale, g api.Guild, id surveyID, name, comment string) *discordgo.InteractionResponseData {
 	text := "### " + l.T("answer.thanks", "emoji", moodEmoji(id.Mood), "name", name) + "\n" +
 		l.T("answer.saved", "mood", l.T(fmt.Sprintf("mood.%d", id.Mood)))
-	components := []discordgo.MessageComponent{}
+	change := id
+	change.Action = actionChange
+	row := []discordgo.MessageComponent{
+		discordgo.Button{Label: l.T("answer.change_button"), Style: discordgo.SecondaryButton, CustomID: change.String()},
+	}
 	if comment == "" {
-		text += "\n\n" + l.T("answer.comment_prompt")
 		note := id
 		note.Action = actionNote
-		components = []discordgo.MessageComponent{discordgo.ActionsRow{Components: []discordgo.MessageComponent{
-			discordgo.Button{Label: l.T("answer.comment_button"), Emoji: &discordgo.ComponentEmoji{Name: "✏️"}, Style: discordgo.PrimaryButton, CustomID: note.String()},
-		}}}
+		row = append([]discordgo.MessageComponent{
+			discordgo.Button{Label: l.T("answer.comment_button"), Emoji: &discordgo.ComponentEmoji{Name: "💬"}, Style: discordgo.PrimaryButton, CustomID: note.String()},
+		}, row...)
 	} else {
 		text += "\n" + quote(comment)
 	}
@@ -149,20 +192,45 @@ func answeredMessage(l *i18n.Locale, g api.Guild, id surveyID, name, comment str
 			Description: text,
 			Color:       moodColor(api.Report{Responses: 1, Average: float64(id.Mood)}),
 		}},
-		Components:      components,
+		Components:      []discordgo.MessageComponent{discordgo.ActionsRow{Components: row}},
 		AllowedMentions: &discordgo.MessageAllowedMentions{},
 	}
 }
 
-func noteModal(l *i18n.Locale, id surveyID) *discordgo.InteractionResponseData {
+// closedColor is Discord's grey, for a survey that can no longer be answered or is paused.
+const closedColor = 0x4e5058
+
+// closedSurvey is a survey that can no longer be answered: just its server and day, in grey.
+func closedSurvey(l *i18n.Locale, g api.Guild, day string) *discordgo.InteractionResponseData {
+	return &discordgo.InteractionResponseData{
+		Content:         "",
+		Embeds:          []*discordgo.MessageEmbed{closedEmbed(l, g.Name, day)},
+		Components:      []discordgo.MessageComponent{},
+		AllowedMentions: &discordgo.MessageAllowedMentions{},
+	}
+}
+
+func closedEmbed(l *i18n.Locale, guildName, day string) *discordgo.MessageEmbed {
+	return &discordgo.MessageEmbed{
+		Author: &discordgo.MessageEmbedAuthor{Name: l.T("survey.closed_title", "guild", guildName, "date", longDate(l, parseDay(day)))},
+		Color:  closedColor,
+	}
+}
+
+// noteModal asks for the comment and says who reads it.
+func noteModal(l *i18n.Locale, g api.Guild, id surveyID) *discordgo.InteractionResponseData {
 	id.Action = actionNoteModal
+	label := l.T("modal.label_anonymous")
+	if !g.Anonymous {
+		label = l.T("modal.label_named")
+	}
 	return &discordgo.InteractionResponseData{
 		CustomID: id.String(),
 		Title:    l.T("modal.title"),
 		Components: []discordgo.MessageComponent{discordgo.ActionsRow{Components: []discordgo.MessageComponent{
 			discordgo.TextInput{
 				CustomID:    "comment",
-				Label:       l.T("modal.label"),
+				Label:       label,
 				Style:       discordgo.TextInputParagraph,
 				Required:    true,
 				MaxLength:   500,
@@ -187,7 +255,7 @@ const (
 func reportMessage(l *i18n.Locale, g api.Guild, r api.Report) *discordgo.MessageSend {
 	embed := &discordgo.MessageEmbed{
 		Title:  fmt.Sprintf("HappyX · %s", g.Name),
-		Footer: &discordgo.MessageEmbedFooter{Text: l.T("report.period", "from", r.From, "to", r.To)},
+		Footer: &discordgo.MessageEmbedFooter{Text: l.T("report.period", "from", shortDate(l, r.From), "to", shortDate(l, r.To))},
 		Color:  moodColor(r),
 	}
 	msg := &discordgo.MessageSend{Embeds: []*discordgo.MessageEmbed{embed}}
@@ -207,7 +275,7 @@ func summary(l *i18n.Locale, r api.Report) string {
 		return l.T("report.no_responses")
 	}
 	return l.T("report.summary",
-		"average", l.T("report.average"), "value", fmt.Sprintf("%.1f", r.Average), "emoji", moodEmoji(int(r.Average+0.5)),
+		"average", l.T("report.average"), "value", l.Decimal(r.Average), "emoji", moodEmoji(int(r.Average+0.5)),
 		"responses", l.T("report.responses"), "count", r.Responses,
 		"people", l.T("report.people"), "people_count", r.Respondents)
 }
@@ -264,6 +332,15 @@ func dayLabel(l *i18n.Locale, day string) string {
 	return fmt.Sprintf("%s %d %s", l.List("date.weekdays")[d.Weekday()], d.Day(), l.List("date.months")[d.Month()-1])
 }
 
+// shortDate is "23 oct" in the locale's names.
+func shortDate(l *i18n.Locale, day string) string {
+	d, err := time.Parse(isoDate, day)
+	if err != nil {
+		return day
+	}
+	return l.T("date.short", "day", d.Day(), "month", l.List("date.months")[d.Month()-1])
+}
+
 // moodColor goes from red (bad week) to green (good week); grey without answers.
 func moodColor(r api.Report) int {
 	switch {
@@ -286,7 +363,7 @@ func textSummary(l *i18n.Locale, r api.Report) string {
 	}
 	var b strings.Builder
 	b.WriteString(l.T("report.summary",
-		"average", l.T("report.average"), "value", fmt.Sprintf("%.2f", r.Average), "emoji", moodEmoji(int(r.Average+0.5)),
+		"average", l.T("report.average"), "value", l.Decimal(r.Average), "emoji", moodEmoji(int(r.Average+0.5)),
 		"responses", l.T("report.responses"), "count", r.Responses,
 		"people", l.T("report.people"), "people_count", r.Respondents))
 	b.WriteString("\n\n")

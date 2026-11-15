@@ -15,7 +15,11 @@ func TestSurveyIDRoundTrip(t *testing.T) {
 	if got, ok := parseSurveyID(stop.String()); !ok || got != stop {
 		t.Fatalf("stop round trip: got %+v %v", got, ok)
 	}
-	for _, bad := range []string{"", "hx:mood:1:2026-10-22", "hx:mood:1:2026-10-22:9", "hx:mood:1:d:0", "hx:stop:1:d:3", "xx:mood:1:d:3", "hx:drop:1:d:3"} {
+	opts := surveyID{Action: actionPauseOK, GuildID: "100000000000000001", Day: "2026-10-22", Msg: "1300000000000000001"}
+	if got, ok := parseSurveyID(opts.String()); !ok || got != opts || len(opts.String()) > 100 {
+		t.Fatalf("options round trip with the survey message: got %+v %v", got, ok)
+	}
+	for _, bad := range []string{"hx:pause:1:d:0:notanid", "hx:opts:1:d:2", "hx:change:1:d:0", "", "hx:mood:1:2026-10-22", "hx:mood:1:2026-10-22:9", "hx:mood:1:d:0", "hx:stop:1:d:3", "xx:mood:1:d:3", "hx:drop:1:d:3"} {
 		if _, ok := parseSurveyID(bad); ok {
 			t.Fatalf("%q should not parse", bad)
 		}
@@ -32,7 +36,11 @@ func TestKudosID(t *testing.T) {
 			t.Errorf("round trip %+v: %+v %v", id, got, ok)
 		}
 	}
-	for _, bad := range []string{"", "hxk", "hxk:abc::", "hxk:2:3:", "hxk:2::4", "hx:2::", "hxk:2:3:x"} {
+	opts := surveyID{Action: actionPauseOK, GuildID: "100000000000000001", Day: "2026-10-22", Msg: "1300000000000000001"}
+	if got, ok := parseSurveyID(opts.String()); !ok || got != opts || len(opts.String()) > 100 {
+		t.Fatalf("options round trip with the survey message: got %+v %v", got, ok)
+	}
+	for _, bad := range []string{"hx:pause:1:d:0:notanid", "hx:opts:1:d:2", "hx:change:1:d:0", "", "hxk", "hxk:abc::", "hxk:2:3:", "hxk:2::4", "hx:2::", "hxk:2:3:x"} {
 		if _, ok := parseKudosID(bad); ok {
 			t.Errorf("%q should not parse", bad)
 		}

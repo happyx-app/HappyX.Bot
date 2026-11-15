@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -345,10 +346,32 @@ func (c *Client) GamePlayers(ctx context.Context, guildID string) ([]Member, err
 	return ms, err
 }
 
-func (c *Client) RecordMood(ctx context.Context, guildID, userID, day string, mood int, message string) error {
-	return c.do(ctx, http.MethodPut, memberPath(guildID, userID)+"/mood", map[string]any{
-		"mood": mood, "message": message, "day": day,
-	}, nil)
+func (c *Client) RecordMood(ctx context.Context, guildID, userID, day string, mood int, message string) (MoodEntry, error) {
+	return c.recordMood(ctx, guildID, userID, map[string]any{"mood": mood, "message": message, "day": day})
+}
+
+// ChangeMood records the day's mood and keeps the comment already given that day, if any.
+func (c *Client) ChangeMood(ctx context.Context, guildID, userID, day string, mood int) (MoodEntry, error) {
+	return c.recordMood(ctx, guildID, userID, map[string]any{"mood": mood, "day": day})
+}
+
+func (c *Client) recordMood(ctx context.Context, guildID, userID string, body map[string]any) (MoodEntry, error) {
+	var e MoodEntry
+	err := c.do(ctx, http.MethodPut, memberPath(guildID, userID)+"/mood", body, &e)
+	return e, err
+}
+
+// MoodEntry is one member's answer for a day.
+type MoodEntry struct {
+	Day     string `json:"day"`
+	Mood    int    `json:"mood"`
+	Message string `json:"message"`
+}
+
+// TooOld reports whether err is the API refusing a survey older than yesterday.
+func TooOld(err error) bool {
+	var apiErr *Error
+	return errors.As(err, &apiErr) && apiErr.Status == http.StatusBadRequest && strings.HasPrefix(apiErr.Message, "day is too old")
 }
 
 // GiveKudos records kudos from one member to another. It fails with ErrForbidden when either

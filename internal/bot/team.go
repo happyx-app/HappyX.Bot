@@ -87,6 +87,14 @@ func (b *Bot) handleTeam(ctx context.Context, i *discordgo.InteractionCreate, id
 	}
 	switch id.Action {
 	case teamTell:
+		// Told already about this period: edit that note rather than post a second one.
+		if n, err := b.api.PeriodTeamNote(ctx, id.GuildID, id.From, id.To); err == nil && b.noteAlive(ctx, id.GuildID, n) {
+			b.respond(i, discordgo.InteractionResponseModal, teamModal(l, teamID{Action: teamEditModal, GuildID: id.GuildID, Note: n.ID}, b.channelName(n.ChannelID), n.Body))
+			return
+		} else if err != nil && !errors.Is(err, api.ErrNotFound) {
+			b.replyError(i, l, err)
+			return
+		}
 		channel := g.TeamChannel()
 		if channel == "" {
 			b.ephemeral(i, l.T("team.no_channel", "cmd", "/happyx "+l.T("cmd.config.name")+" "+l.T("opt.team_channel.name")))
@@ -108,7 +116,7 @@ func (b *Bot) handleTeam(ctx context.Context, i *discordgo.InteractionCreate, id
 		if !ok {
 			return
 		}
-		b.respond(i, discordgo.InteractionResponseUpdateMessage, &discordgo.InteractionResponseData{
+		b.answer(i, &discordgo.InteractionResponseData{
 			Content: l.T("team.delete_confirm", "channel", "<#"+n.ChannelID+">"),
 			Components: []discordgo.MessageComponent{discordgo.ActionsRow{Components: []discordgo.MessageComponent{
 				discordgo.Button{Label: l.T("team.cancel"), Style: discordgo.SecondaryButton, CustomID: teamID{Action: teamBack, GuildID: id.GuildID, Note: n.ID}.String()},
@@ -123,8 +131,32 @@ func (b *Bot) handleTeam(ctx context.Context, i *discordgo.InteractionCreate, id
 		if !ok {
 			return
 		}
-		b.respond(i, discordgo.InteractionResponseUpdateMessage, published(l, id.GuildID, n, l.T("team.published", "channel", "<#"+n.ChannelID+">")))
+		b.answer(i, published(l, id.GuildID, n, l.T("team.published", "channel", "<#"+n.ChannelID+">")))
 	}
+}
+
+// answer replaces the private message the button is on, or, for the report's own buttons and
+// the forms they open, answers with a new private message: the report stays as it is.
+func (b *Bot) answer(i *discordgo.InteractionCreate, data *discordgo.InteractionResponseData) {
+	if i.Message != nil && i.Message.Flags&discordgo.MessageFlagsEphemeral != 0 {
+		b.respond(i, discordgo.InteractionResponseUpdateMessage, data)
+		return
+	}
+	data.Flags |= discordgo.MessageFlagsEphemeral
+	b.respond(i, discordgo.InteractionResponseChannelMessageWithSource, data)
+}
+
+// noteAlive reports whether a note's message is still in its channel. One deleted by hand in
+// Discord is forgotten, so nothing links to it any more. When Discord doesn't say (no permission
+// to read the channel, an outage), the note is taken as alive.
+func (b *Bot) noteAlive(ctx context.Context, guildID string, n api.TeamNote) bool {
+	if _, err := b.dg.ChannelMessage(n.ChannelID, n.MessageID); err != nil && gone(err) {
+		if derr := b.api.DeleteTeamNote(ctx, guildID, n.ID); derr != nil && !errors.Is(derr, api.ErrNotFound) {
+			b.log.Warn("forget team note deleted in Discord", "guild", guildID, "err", derr)
+		}
+		return false
+	}
+	return true
 }
 
 // managesGuild checks the user can change the guild's settings, the same as /happyx config. The
@@ -151,7 +183,7 @@ func (b *Bot) managesGuild(ctx context.Context, i *discordgo.InteractionCreate, 
 func (b *Bot) note(ctx context.Context, i *discordgo.InteractionCreate, l *i18n.Locale, id teamID) (api.TeamNote, bool) {
 	n, err := b.api.TeamNote(ctx, id.GuildID, id.Note)
 	if errors.Is(err, api.ErrNotFound) {
-		b.respond(i, discordgo.InteractionResponseUpdateMessage, &discordgo.InteractionResponseData{Content: l.T("team.gone"), Components: []discordgo.MessageComponent{}})
+		b.answer(i, &discordgo.InteractionResponseData{Content: l.T("team.gone"), Components: []discordgo.MessageComponent{}})
 		return n, false
 	}
 	if err != nil {
@@ -247,7 +279,16 @@ func (b *Bot) publishNote(ctx context.Context, i *discordgo.InteractionCreate, l
 	m, err := b.dg.ChannelMessageSendComplex(channel, teamCard(l, n))
 	if err != nil {
 		b.log.Warn("team note post failed", "guild", g.DiscordID, "channel", channel, "err", err)
-		b.ephemeral(i, l.T("team.cant_post", "channel", "<#"+channel+">")+"\n"+quote(body))
+		var text string
+		switch {
+		case gone(err):
+			text = l.T("team.channel_gone", "cmd", "/happyx "+l.T("cmd.config.name")+" "+l.T("opt.team_channel.name"))
+		case forbidden(err):
+			text = l.T("team.cant_post", "channel", "<#"+channel+">")
+		default:
+			text = l.T("team.post_failed")
+		}
+		b.ephemeral(i, text+"\n"+quote(body))
 		return
 	}
 	n.MessageID = m.ID
@@ -275,7 +316,7 @@ func (b *Bot) editNote(ctx context.Context, i *discordgo.InteractionCreate, l *i
 	if _, err := b.dg.ChannelMessageEditComplex(&discordgo.MessageEdit{Channel: n.ChannelID, ID: n.MessageID, Embeds: &embeds}); err != nil {
 		if gone(err) {
 			_ = b.api.DeleteTeamNote(ctx, g.DiscordID, n.ID)
-			b.respond(i, discordgo.InteractionResponseUpdateMessage, &discordgo.InteractionResponseData{Content: l.T("team.gone") + "\n" + quote(n.Body), Components: []discordgo.MessageComponent{}})
+			b.answer(i, &discordgo.InteractionResponseData{Content: l.T("team.gone") + "\n" + quote(n.Body), Components: []discordgo.MessageComponent{}})
 			return
 		}
 		b.log.Warn("edit team note", "guild", g.DiscordID, "err", err)
@@ -287,7 +328,7 @@ func (b *Bot) editNote(ctx context.Context, i *discordgo.InteractionCreate, l *i
 		b.replyError(i, l, err)
 		return
 	}
-	b.respond(i, discordgo.InteractionResponseUpdateMessage, published(l, g.DiscordID, saved, l.T("team.edited", "channel", "<#"+n.ChannelID+">")))
+	b.answer(i, published(l, g.DiscordID, saved, l.T("team.edited", "channel", "<#"+n.ChannelID+">")))
 }
 
 // deleteNote takes the message out of the channel, then forgets the note.
@@ -317,6 +358,12 @@ func gone(err error) bool {
 	return errors.As(err, &re) && re.Response != nil && re.Response.StatusCode == http.StatusNotFound
 }
 
+// forbidden reports whether Discord refused for lack of permissions.
+func forbidden(err error) bool {
+	var re *discordgo.RESTError
+	return errors.As(err, &re) && re.Response != nil && re.Response.StatusCode == http.StatusForbidden
+}
+
 // toldButton is the thanks card's link to what an admin told the team the survey day before, or
 // nil if nobody did.
 func (b *Bot) toldButton(ctx context.Context, l *i18n.Locale, guildID, day string) *discordgo.Button {
@@ -325,6 +372,9 @@ func (b *Bot) toldButton(ctx context.Context, l *i18n.Locale, guildID, day strin
 		if !errors.Is(err, api.ErrNotFound) {
 			b.log.Warn("current team note", "guild", guildID, "err", err)
 		}
+		return nil
+	}
+	if !b.noteAlive(ctx, guildID, n) {
 		return nil
 	}
 	name := b.displayName(guildID, api.Member{DiscordID: n.AuthorDiscordID, Username: n.AuthorUsername})
@@ -483,4 +533,14 @@ func teamChannelLine(l *i18n.Locale, g api.Guild) string {
 		line += " · " + l.T("team.summary_on")
 	}
 	return line
+}
+
+// teamChannelWarning says HappyX can't post in the team channel, where the Monday summary and the
+// notes would fail; empty when it can or there is none.
+func (b *Bot) teamChannelWarning(l *i18n.Locale, g api.Guild) string {
+	ch := g.TeamChannel()
+	if ch == "" || b.dg == nil || b.canPost(ch) {
+		return ""
+	}
+	return "\n" + l.T("team.channel_cant", "channel", "<#"+ch+">")
 }

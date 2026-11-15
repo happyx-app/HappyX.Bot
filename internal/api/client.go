@@ -596,6 +596,14 @@ func (c *Client) CurrentTeamNote(ctx context.Context, guildID, day string) (Team
 	return out, err
 }
 
+// PeriodTeamNote is the note already told about the report period from..to. It fails with
+// ErrNotFound when there is none.
+func (c *Client) PeriodTeamNote(ctx context.Context, guildID, from, to string) (TeamNote, error) {
+	var out TeamNote
+	err := c.do(ctx, http.MethodGet, teamNotesPath(guildID)+"?"+url.Values{"from": {from}, "to": {to}}.Encode(), nil, &out)
+	return out, err
+}
+
 func teamNotesPath(guildID string) string {
 	return "/v1/guilds/" + url.PathEscape(guildID) + "/team-notes"
 }

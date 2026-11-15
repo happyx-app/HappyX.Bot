@@ -234,39 +234,64 @@ func TestPreviousPeriod(t *testing.T) {
 	}
 }
 
-// The thanks card links what an admin told the team, and stays as it was when nobody did.
+// The thanks card links what an admin told the team, and stays as it was when nobody did or the
+// message was deleted by hand in Discord, which also forgets the note.
 func TestWithTold(t *testing.T) {
-	var asked string
-	note := true
+	var asked, deleted string
+	note, msgGone := true, false
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		asked = r.URL.Path + "?" + r.URL.RawQuery
-		if !note {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/discord/channels/"): // Discord: the note's message
+			if msgGone {
+				w.WriteHeader(http.StatusNotFound)
+				io.WriteString(w, `{"message":"Unknown Message","code":10008}`)
+				return
+			}
+			io.WriteString(w, `{"id":"400000000000000001","channel_id":"200000000000000001"}`)
+		case r.Method == http.MethodDelete:
+			deleted = r.URL.Path
+			w.WriteHeader(http.StatusNoContent)
+		case !note:
+			asked = r.URL.Path + "?" + r.URL.RawQuery
 			w.WriteHeader(http.StatusNotFound)
 			io.WriteString(w, `{"error":"not found"}`)
-			return
+		default:
+			asked = r.URL.Path + "?" + r.URL.RawQuery
+			io.WriteString(w, `{"id":3,"author_discord_user_id":"300000000000000001","author_username":"alex","from":"2026-11-02","to":"2026-11-08","body":"Martes sin reuniones","channel_id":"200000000000000001","message_id":"400000000000000001","posted_on":"2026-11-13"}`)
 		}
-		io.WriteString(w, `{"id":3,"author_discord_user_id":"300000000000000001","author_username":"alex","from":"2026-11-02","to":"2026-11-08","body":"Martes sin reuniones","channel_id":"200000000000000001","message_id":"400000000000000001","posted_on":"2026-11-13"}`)
 	}))
 	defer srv.Close()
+	defer func(old string) { discordgo.EndpointChannels = old }(discordgo.EndpointChannels)
+	discordgo.EndpointChannels = srv.URL + "/discord/channels/"
 	dg, _ := discordgo.New("Bot x")
 	b := &Bot{api: api.New(srv.URL, "key"), dg: dg, log: slog.New(slog.NewTextHandler(io.Discard, nil)), now: time.Now}
 	es := i18n.Get("es")
 	id := surveyID{GuildID: "100000000000000001", Day: "2026-11-16", Mood: 4}
+	buttons := func() []discordgo.MessageComponent {
+		data := b.withTold(context.Background(), es, id, answeredMessage(es, api.Guild{Name: "Equipo"}, id, "Iván", ""))
+		return data.Components[0].(discordgo.ActionsRow).Components
+	}
 
-	data := b.withTold(context.Background(), es, id, answeredMessage(es, api.Guild{Name: "Equipo"}, id, "Iván", ""))
+	row := buttons()
 	if asked != "/v1/guilds/100000000000000001/team-notes/current?day=2026-11-16" {
 		t.Errorf("asked %q", asked)
 	}
-	row := data.Components[0].(discordgo.ActionsRow).Components
 	last := row[len(row)-1].(discordgo.Button)
 	if len(row) != 3 || last.Label != "Ver lo que contó alex" ||
 		last.URL != "https://discord.com/channels/100000000000000001/200000000000000001/400000000000000001" {
 		t.Fatalf("thanks card should link the note: %+v", row)
 	}
 
-	note = false
-	data = b.withTold(context.Background(), es, id, answeredMessage(es, api.Guild{Name: "Equipo"}, id, "Iván", ""))
-	if n := len(data.Components[0].(discordgo.ActionsRow).Components); n != 2 {
-		t.Fatalf("without a note the card keeps its %d buttons, got %d", 2, n)
+	msgGone = true
+	if row := buttons(); len(row) != 2 {
+		t.Fatalf("a message deleted in Discord gets no link: %+v", row)
+	}
+	if deleted != "/v1/guilds/100000000000000001/team-notes/3" {
+		t.Errorf("the note of a deleted message should be forgotten, deleted %q", deleted)
+	}
+
+	msgGone, note = false, false
+	if row := buttons(); len(row) != 2 {
+		t.Fatalf("without a note the card keeps its 2 buttons: %+v", row)
 	}
 }

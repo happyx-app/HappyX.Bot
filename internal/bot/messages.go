@@ -302,7 +302,7 @@ func reportMessageWith(l *i18n.Locale, g api.Guild, r api.Report, o reportOption
 		})
 	}
 	if o.DashboardURL != "" {
-		buttons = append(buttons, discordgo.Button{Label: l.T("report.dashboard_button"), Style: discordgo.LinkButton, URL: o.DashboardURL})
+		buttons = append(buttons, discordgo.Button{Label: l.T("setup.open_web"), Style: discordgo.LinkButton, URL: o.DashboardURL})
 	}
 	if len(buttons) > 0 {
 		msg.Components = []discordgo.MessageComponent{discordgo.ActionsRow{Components: buttons}}

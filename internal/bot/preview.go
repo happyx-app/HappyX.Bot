@@ -79,7 +79,7 @@ func Previews(code string) []Preview {
 	prevWeek := previewReport()
 	prevWeek.Average, prevWeek.Distribution = 3.4, map[string]int{"2": 6, "3": 12, "4": 14, "5": 4}
 	note := api.TeamNote{ID: 1, AuthorDiscordID: PreviewAdminID, AuthorUsername: "alex", From: "2026-10-19", To: "2026-10-25",
-		Body:      "Muchas reuniones seguidas: lo hemos visto. Desde el lunes, martes por la tarde sin reuniones. Lo revisamos en dos semanas.",
+		Body:      "Gracias por responder. Desde el lunes, martes por la tarde sin reuniones, para tener un rato seguido de trabajo. Lo revisamos en dos semanas.",
 		ChannelID: PreviewChannelID, MessageID: "600000000000000001"}
 	told := answeredMessage(l, g, surveyID{Action: actionMood, GuildID: g.DiscordID, Day: "2026-10-26", Mood: 4}, "Ana", "")
 	if row, ok := told.Components[0].(discordgo.ActionsRow); ok {

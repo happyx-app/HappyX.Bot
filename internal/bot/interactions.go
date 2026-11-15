@@ -480,7 +480,7 @@ func (b *Bot) statusMessage(l *i18n.Locale, g api.Guild, you, offLine, vacationL
 		text += "\n\n" + l.T("status.settings",
 			"frequency", l.T("freq."+g.ReportFrequency), "admin", "<@"+g.AdminDiscordID+">",
 			"language", i18n.Get(g.Language).Name, "participants", participants) +
-			reportDMLine(l, g) + "\n" + kudosChannelLine(l, g) + "\n" + teamChannelLine(l, g) + "\n" + gameLine(l, g)
+			reportDMLine(l, g) + "\n" + kudosChannelLine(l, g) + "\n" + teamChannelLine(l, g) + b.teamChannelWarning(l, g) + "\n" + gameLine(l, g)
 	}
 	return &discordgo.InteractionResponseData{
 		Content:         text,
@@ -565,6 +565,9 @@ func (b *Bot) cmdConfig(ctx context.Context, i *discordgo.InteractionCreate, l *
 		l = i18n.Get(g.Language) // confirm in the language just chosen
 	}
 	s := configSaved(l, g, p, before)
+	if p.TeamChannelID != nil || p.KudosChannelID != nil || p.TeamSummary != nil {
+		s += b.teamChannelWarning(l, g)
+	}
 	if p.SurveyEnabled != nil {
 		s += "\n" + b.surveyNotice(ctx, l, g, true)
 	} else if line := b.surveyOffLine(l, g); line != "" {

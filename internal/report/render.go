@@ -81,7 +81,8 @@ func Render(l *i18n.Locale, guildName string, r api.Report) ([]byte, error) {
 	if r.Responses == 0 {
 		bottom = chartTop + emptyH
 	}
-	height := int(bottom + footerGap + pad - 8)
+	footer := footerLines(l, r)
+	height := int(bottom + footerGap + pad - 8 + float64(len(footer)-1)*footerLineH)
 
 	dc := gg.NewContext(width, height)
 	dc.SetColor(colPage)
@@ -114,13 +115,13 @@ func Render(l *i18n.Locale, guildName string, r api.Report) ([]byte, error) {
 		setFont(dc, medium, 24)
 		dc.SetColor(colText2)
 		dc.DrawStringAnchored(l.T("report.no_responses"), width/2, chartTop+emptyH/2, 0.5, 0.35)
-		drawFooter(dc, l, r, float64(height))
+		drawFooter(dc, footer, float64(height))
 		return encode(dc)
 	}
 
 	drawDailyChart(dc, l, r.Days, chartTop, chartH)
 	drawDistribution(dc, l, r, distTop, distH)
-	drawFooter(dc, l, r, float64(height))
+	drawFooter(dc, footer, float64(height))
 	return encode(dc)
 }
 
@@ -331,26 +332,49 @@ func drawDistribution(dc *gg.Context, l *i18n.Locale, r api.Report, top, h float
 	}
 }
 
-func drawFooter(dc *gg.Context, l *i18n.Locale, r api.Report, height float64) {
-	text := l.T("report.anonymous")
+// footerLineH is the distance between the footer's lines when it doesn't fit in one.
+const footerLineH = 26.0
+
+// footerLines says how the answers were given and what the report leaves out, in as many lines
+// as it needs to fit the width, breaking only between its parts.
+func footerLines(l *i18n.Locale, r api.Report) []string {
+	parts := []string{l.T("report.anonymous")}
 	if !r.Anonymous {
-		text = l.T("report.named")
+		parts[0] = l.T("report.named")
 	}
 	for _, d := range r.Days {
 		if d.Withheld {
-			text += " · " + l.T("report.days_withheld")
+			parts = append(parts, l.T("report.days_withheld"))
 			break
 		}
 	}
 	switch n := len(r.Messages); {
 	case n == 1:
-		text += " · " + l.T("report.one_comment")
+		parts = append(parts, l.T("report.one_comment"))
 	case n > 1:
-		text += " · " + l.T("report.n_comments", "n", n)
+		parts = append(parts, l.T("report.n_comments", "n", n))
 	}
+	dc := gg.NewContext(1, 1)
+	setFont(dc, regular, 18)
+	var lines []string
+	for _, p := range parts {
+		if n := len(lines); n > 0 {
+			if w, _ := dc.MeasureString(lines[n-1] + " · " + p); w <= width-2*pad {
+				lines[n-1] += " · " + p
+				continue
+			}
+		}
+		lines = append(lines, p)
+	}
+	return lines
+}
+
+func drawFooter(dc *gg.Context, lines []string, height float64) {
 	setFont(dc, regular, 18)
 	dc.SetColor(colText2)
-	dc.DrawString(text, pad, height-pad)
+	for i, line := range lines {
+		dc.DrawString(line, pad, height-pad-float64(len(lines)-1-i)*footerLineH)
+	}
 }
 
 // --- helpers ---

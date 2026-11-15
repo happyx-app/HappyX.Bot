@@ -479,7 +479,9 @@ func (b *Bot) closeOldSurveys(l *i18n.Locale, g api.Guild, today *discordgo.Mess
 			continue
 		}
 		edit := &discordgo.MessageEdit{Channel: m.ChannelID, ID: m.ID, Components: &[]discordgo.MessageComponent{}}
-		if !answered {
+		if !answered || changingAnswer(m) {
+			// A survey left at «Change answer» shows the question, not the answer: it closes
+			// like an unanswered one, though the answer given stays saved.
 			embeds := []*discordgo.MessageEmbed{closedEmbed(l, g.Name, day)}
 			empty := ""
 			edit.Embeds, edit.Content = &embeds, &empty
@@ -506,6 +508,16 @@ func oldSurvey(m *discordgo.Message, guildID string) (day string, answered, ok b
 		}
 	}
 	return day, answered, ok
+}
+
+// changingAnswer reports whether m shows the faces of «Change answer».
+func changingAnswer(m *discordgo.Message) bool {
+	for _, id := range surveyIDs(m) {
+		if id.Action == actionRemood {
+			return true
+		}
+	}
+	return false
 }
 
 // surveyDay is the day of a survey message of guildID, or "" if it isn't one.

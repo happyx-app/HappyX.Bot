@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/bwmarrin/discordgo"
 
@@ -54,7 +56,13 @@ func (b *Bot) evolutionURL(guildID string) string {
 
 // surveySchedule is when g's survey goes out, like «De lunes a viernes a las 13:00 (Europe/Madrid).».
 func surveySchedule(l *i18n.Locale, g api.Guild) string {
-	return l.T("options.schedule", "days", daysLabel(l, g.WorkingDays), "hour", fmt.Sprintf("%02d", g.SurveyHour), "timezone", g.Timezone)
+	return l.T("options.schedule", "days", capitalized(daysLabel(l, g.WorkingDays)), "hour", fmt.Sprintf("%02d", g.SurveyHour), "timezone", g.Timezone)
+}
+
+// capitalized is s with its first letter in upper case, to start a sentence.
+func capitalized(s string) string {
+	r, n := utf8.DecodeRuneInString(s)
+	return string(unicode.ToUpper(r)) + s[n:]
 }
 
 // privacyLine says what the admins see of the member's answers.

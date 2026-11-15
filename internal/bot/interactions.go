@@ -372,7 +372,15 @@ func (b *Bot) handleCommand(ctx context.Context, i *discordgo.InteractionCreate)
 			b.replyError(i, l, err)
 			return
 		}
-		b.ephemeral(i, l.T("resume.done", "guild", b.guildName(i.GuildID)))
+		g, _ := b.guildAndLocale(ctx, i.GuildID)
+		if g.Name == "" {
+			g.Name = b.guildName(i.GuildID)
+		}
+		if g.Name == "" {
+			b.ephemeral(i, l.T("resume.done_here"))
+			return
+		}
+		b.ephemeral(i, l.T("resume.done", "guild", g.Name))
 	case cmdVacation:
 		b.cmdVacation(ctx, i, l, user, sub.Options)
 	case cmdConfig:
@@ -436,7 +444,11 @@ func (b *Bot) cmdStatus(ctx context.Context, i *discordgo.InteractionCreate, l *
 // statusMessage is /happyx status: where the member stands, what admins see of their answers,
 // their vacations and, for whoever can see the reports, the server's settings.
 func (b *Bot) statusMessage(l *i18n.Locale, g api.Guild, you, offLine, vacationLines string, paused, settings bool, participants int) *discordgo.InteractionResponseData {
-	text := l.T("status.text", "guild", g.Name, "you", you, "schedule", surveySchedule(l, g))
+	schedule := surveySchedule(l, g)
+	if paused {
+		schedule = "" // it doesn't come on those days now
+	}
+	text := strings.TrimSpace(l.T("status.text", "guild", g.Name, "you", you, "schedule", schedule))
 	if offLine != "" {
 		text += "\n" + offLine
 	}

@@ -338,7 +338,7 @@ func drawFooter(dc *gg.Context, l *i18n.Locale, r api.Report, height float64) {
 	}
 	for _, d := range r.Days {
 		if d.Withheld {
-			text += " · " + l.T("report.days_withheld", "k", max(r.AnonymityThreshold, api.MinAnonymityThreshold))
+			text += " · " + l.T("report.days_withheld")
 			break
 		}
 	}

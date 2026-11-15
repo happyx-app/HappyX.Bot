@@ -207,6 +207,9 @@ type ReportDay struct {
 	// Withheld: that day's anonymous answers came from fewer people than the threshold, so it
 	// has no average.
 	Withheld bool `json:"withheld"`
+	// AnonymityThreshold is the one the day was judged by: it can be above the guild's
+	// current one if the guild lowered it after people answered. 0 from older APIs.
+	AnonymityThreshold int `json:"anonymity_threshold"`
 }
 
 // Plotted reports whether the day has an average to show.

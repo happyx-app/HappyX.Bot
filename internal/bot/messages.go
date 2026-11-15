@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -303,19 +304,32 @@ func summary(l *i18n.Locale, r api.Report) string {
 		"people", l.T("report.people"), "people_count", r.Respondents) + withheldDays(l, r)
 }
 
-// withheldDays names the days with too few people, which count only in the answers: «Sin contar
-// ma 20 oct: respondieron menos de 3 personas.» Empty when there are none.
+// withheldDays names the days with too few people, which count only in the answers, one line
+// per threshold they were judged by (they differ only after the guild lowered it). Empty when
+// there are none.
 func withheldDays(l *i18n.Locale, r api.Report) string {
-	var days []string
+	byK := map[int][]string{}
+	var ks []int
 	for _, d := range r.Days {
-		if d.Withheld {
-			days = append(days, dayLabel(l, d.Day))
+		if !d.Withheld {
+			continue
 		}
+		k := d.AnonymityThreshold
+		if k == 0 { // older APIs
+			k = r.AnonymityThreshold
+		}
+		k = max(k, api.MinAnonymityThreshold)
+		if byK[k] == nil {
+			ks = append(ks, k)
+		}
+		byK[k] = append(byK[k], dayLabel(l, d.Day))
 	}
-	if len(days) == 0 {
-		return ""
+	slices.Sort(ks)
+	var b strings.Builder
+	for _, k := range ks {
+		b.WriteString("\n-# " + l.T("report.withheld_days", "days", strings.Join(byK[k], ", "), "k", k))
 	}
-	return "\n-# " + l.T("report.withheld_days", "days", strings.Join(days, ", "), "k", max(r.AnonymityThreshold, api.MinAnonymityThreshold))
+	return b.String()
 }
 
 // comments lists the comments as quotes, stopping at the budget with a count of the rest. An

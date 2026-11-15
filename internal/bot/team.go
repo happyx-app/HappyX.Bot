@@ -315,6 +315,11 @@ func (b *Bot) publishNote(ctx context.Context, i *discordgo.InteractionCreate, l
 		b.ephemeral(i, l.T("team.no_channel", "cmd", "/happyx "+l.T("cmd.config.name")+" "+l.T("opt.team_channel.name"))+"\n"+quote(body))
 		return
 	}
+	// Usually another admin told the team while this one was writing: show theirs, post nothing.
+	if first, err := b.api.PeriodTeamNote(ctx, g.DiscordID, id.From, id.To); err == nil && b.noteAlive(ctx, g.DiscordID, first) {
+		b.answer(i, toldAlready(l, g.DiscordID, first, user, body))
+		return
+	}
 	n := api.TeamNote{AuthorDiscordID: user.ID, From: id.From, To: id.To, Body: body, ChannelID: channel}
 	m, err := b.dg.ChannelMessageSendComplex(channel, teamCard(l, n))
 	if err != nil {
@@ -339,7 +344,7 @@ func (b *Bot) publishNote(ctx context.Context, i *discordgo.InteractionCreate, l
 			b.log.Warn("take back second team note", "guild", g.DiscordID, "err", derr)
 		}
 		if first, ferr := b.api.PeriodTeamNote(ctx, g.DiscordID, id.From, id.To); ferr == nil {
-			b.answer(i, published(l, g.DiscordID, first, l.T("team.told_by", "user", "<@"+first.AuthorDiscordID+">", "channel", "<#"+first.ChannelID+">")+"\n"+quote(body), first.AuthorDiscordID == user.ID))
+			b.answer(i, toldAlready(l, g.DiscordID, first, user, body))
 			return
 		}
 	}
@@ -400,6 +405,15 @@ func (b *Bot) deleteNote(ctx context.Context, i *discordgo.InteractionCreate, l 
 		Content: l.T("team.deleted", "channel", "<#"+n.ChannelID+">"), Components: []discordgo.MessageComponent{},
 		AllowedMentions: &discordgo.MessageAllowedMentions{},
 	})
+}
+
+// toldAlready answers someone who wrote a note for a period that already has one: the note there
+// is, with their own text below so they don't lose it.
+func toldAlready(l *i18n.Locale, guildID string, n api.TeamNote, user *discordgo.User, body string) *discordgo.InteractionResponseData {
+	if n.AuthorDiscordID == user.ID {
+		return published(l, guildID, n, l.T("team.published", "channel", "<#"+n.ChannelID+">")+"\n"+quote(body), true)
+	}
+	return published(l, guildID, n, l.T("team.told_by", "user", "<@"+n.AuthorDiscordID+">", "channel", "<#"+n.ChannelID+">")+"\n"+quote(body), false)
 }
 
 // gone reports whether Discord says the message or its channel no longer exists.

@@ -230,7 +230,7 @@ func drawDailyChart(dc *gg.Context, l *i18n.Locale, days []api.ReportDay, top, h
 			continue
 		}
 		dc.SetColor(colText2)
-		if d.Responses == 0 {
+		if !d.Plotted() {
 			dc.SetColor(colMuted)
 		}
 		dc.DrawStringAnchored(dayLabel(l, d.Day, len(days) <= 10), xOf(i), plotBottom+32, 0.5, 0)
@@ -243,7 +243,7 @@ func drawDailyChart(dc *gg.Context, l *i18n.Locale, days []api.ReportDay, top, h
 	dc.SetLineJoin(gg.LineJoinRound)
 	drawing := false
 	for i, d := range days {
-		if d.Responses == 0 {
+		if !d.Plotted() {
 			if drawing {
 				dc.Stroke()
 			}
@@ -261,11 +261,12 @@ func drawDailyChart(dc *gg.Context, l *i18n.Locale, days []api.ReportDay, top, h
 		dc.Stroke()
 	}
 
-	// Markers with a surface ring so they read over the line. Days without answers get no
-	// marker (a dot at the bottom would read as the worst mood); their x label is muted instead.
+	// Markers with a surface ring so they read over the line. Days without answers, or with too
+	// few people to show their average, get no marker (a dot at the bottom would read as the
+	// worst mood); their x label is muted instead.
 	for i, d := range days {
 		x := xOf(i)
-		if d.Responses == 0 {
+		if !d.Plotted() {
 			continue
 		}
 		y := yOf(d.Average)
@@ -334,6 +335,12 @@ func drawFooter(dc *gg.Context, l *i18n.Locale, r api.Report, height float64) {
 	text := l.T("report.anonymous")
 	if !r.Anonymous {
 		text = l.T("report.named")
+	}
+	for _, d := range r.Days {
+		if d.Withheld {
+			text += " · " + l.T("report.days_withheld", "k", max(r.AnonymityThreshold, api.MinAnonymityThreshold))
+			break
+		}
 	}
 	switch n := len(r.Messages); {
 	case n == 1:

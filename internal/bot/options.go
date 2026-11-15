@@ -65,17 +65,20 @@ func capitalized(s string) string {
 	return string(unicode.ToUpper(r)) + s[n:]
 }
 
-// privacyLine says what the admins see of the member's answers.
-func privacyLine(l *i18n.Locale, g api.Guild) string {
-	if g.Anonymous {
-		return l.T("options.anonymous")
+// privacyLine says what the admins see of the member's answers on day.
+func privacyLine(l *i18n.Locale, g api.Guild, day string) string {
+	switch {
+	case g.NamedSoon(day):
+		return l.T("options.anonymous_today", "date", shortDate(l, g.NamedSince))
+	case g.AnonymousOn(day):
+		return l.T("options.anonymous", "k", g.Threshold())
 	}
 	return l.T("options.named")
 }
 
 func (b *Bot) optionsMessage(l *i18n.Locale, g api.Guild, day, msg string) *discordgo.InteractionResponseData {
 	return &discordgo.InteractionResponseData{
-		Content:         l.T("options.text", "guild", g.Name, "schedule", surveySchedule(l, g)) + "\n" + privacyLine(l, g),
+		Content:         l.T("options.text", "guild", g.Name, "schedule", surveySchedule(l, g)) + "\n" + privacyLine(l, g, guildToday(g, b.now()).Format(isoDate)),
 		Components:      b.optionsButtons(l, g, day, msg, false),
 		Flags:           discordgo.MessageFlagsEphemeral,
 		AllowedMentions: &discordgo.MessageAllowedMentions{},

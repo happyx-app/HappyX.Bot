@@ -30,6 +30,7 @@ const (
 	menuKudos = "Give kudos"
 
 	optAnonymous = "anonymous"
+	optMinPeople = "min_people" // the anonymity threshold
 	optHour      = "hour"
 	optTimezone  = "timezone"
 	optFrequency = "frequency"
@@ -44,6 +45,9 @@ const (
 	optSurvey    = "survey"
 	optFrom      = "from"
 	optTo        = "to"
+
+	// maxAnonymityThreshold is the API's highest anonymity threshold.
+	maxAnonymityThreshold = 50
 
 	periodLast    = "last"
 	periodCurrent = "current"
@@ -75,6 +79,9 @@ func commands() []*discordgo.ApplicationCommand {
 		}
 	}
 
+	minPeople := opt(discordgo.ApplicationCommandOptionInteger, optMinPeople)
+	minThreshold := float64(api.MinAnonymityThreshold)
+	minPeople.MinValue, minPeople.MaxValue = &minThreshold, maxAnonymityThreshold
 	hour := opt(discordgo.ApplicationCommandOptionInteger, optHour)
 	hour.MinValue, hour.MaxValue = &minHour, 23
 	frequency := opt(discordgo.ApplicationCommandOptionString, optFrequency)
@@ -131,6 +138,7 @@ func commands() []*discordgo.ApplicationCommand {
 			sub(cmdConfig,
 				opt(discordgo.ApplicationCommandOptionBoolean, optSurvey),
 				opt(discordgo.ApplicationCommandOptionBoolean, optAnonymous),
+				minPeople,
 				hour,
 				opt(discordgo.ApplicationCommandOptionString, optTimezone),
 				frequency,
@@ -452,7 +460,8 @@ func (b *Bot) statusMessage(l *i18n.Locale, g api.Guild, you, offLine, vacationL
 	if offLine != "" {
 		text += "\n" + offLine
 	}
-	text += "\n" + privacyLine(l, g) + vacationLines
+	today := guildToday(g, b.now()).Format(isoDate)
+	text += "\n" + privacyLine(l, g, today) + vacationLines
 	if settings {
 		text += "\n\n" + l.T("status.settings",
 			"frequency", l.T("freq."+g.ReportFrequency), "admin", "<@"+g.AdminDiscordID+">",
@@ -461,7 +470,7 @@ func (b *Bot) statusMessage(l *i18n.Locale, g api.Guild, you, offLine, vacationL
 	}
 	return &discordgo.InteractionResponseData{
 		Content:         text,
-		Components:      b.optionsButtons(l, g, guildToday(g, b.now()).Format(isoDate), "", paused),
+		Components:      b.optionsButtons(l, g, today, "", paused),
 		Flags:           discordgo.MessageFlagsEphemeral,
 		AllowedMentions: &discordgo.MessageAllowedMentions{},
 	}
@@ -484,6 +493,9 @@ func (b *Bot) cmdConfig(ctx context.Context, i *discordgo.InteractionCreate, l *
 		case optAnonymous:
 			v := o.BoolValue()
 			p.Anonymous = &v
+		case optMinPeople:
+			v := int(o.IntValue())
+			p.AnonymityThreshold = &v
 		case optHour:
 			v := int(o.IntValue())
 			p.SurveyHour = &v
@@ -533,15 +545,18 @@ func (b *Bot) cmdConfig(ctx context.Context, i *discordgo.InteractionCreate, l *
 	b.ephemeral(i, s)
 }
 
-// configSaved confirms the new settings. When the change turned anonymity off, it adds that
-// earlier answers stay anonymous.
+// configSaved confirms the new settings. When the change turned anonymity off, it adds from
+// which day names apply and that earlier answers stay anonymous.
 func configSaved(l *i18n.Locale, g api.Guild, p api.GuildPatch) string {
 	s := l.T("config.saved",
 		"days", workingDaysText(l, g.WorkingDays), "hour", fmt.Sprintf("%02d", g.SurveyHour), "timezone", g.Timezone,
 		"frequency", l.T("freq."+g.ReportFrequency), "admin", "<@"+g.AdminDiscordID+">",
 		"anonymous", yesNo(l, g.Anonymous), "language", i18n.Get(g.Language).Name) + reportDMLine(l, g) + "\n" + kudosChannelLine(l, g) + "\n" + gameLine(l, g)
-	if p.Anonymous != nil && !*p.Anonymous {
-		s += "\n" + l.T("config.now_public")
+	if p.Anonymous != nil && !*p.Anonymous && g.NamedSince != "" {
+		s += "\n" + l.T("config.now_public", "date", shortDate(l, g.NamedSince))
+	}
+	if p.AnonymityThreshold != nil {
+		s += "\n" + l.T("config.min_people", "k", g.Threshold())
 	}
 	if p.GamesEnabled != nil && *p.GamesEnabled {
 		s += "\n" + l.T("config.games_on")

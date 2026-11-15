@@ -277,7 +277,7 @@ func TestSurveyOffersOptions(t *testing.T) {
 func TestOptions(t *testing.T) {
 	es := i18n.Get("es")
 	g := api.Guild{DiscordID: "100000000000000001", Name: "Equipo", Anonymous: true, Timezone: "Europe/Madrid", SurveyHour: 13, WorkingDays: presetDays("mon_fri")}
-	b := &Bot{webURL: "https://happyx.example.com"}
+	b := &Bot{webURL: "https://happyx.example.com", now: func() time.Time { return time.Date(2026, 10, 23, 12, 0, 0, 0, time.UTC) }}
 	o := b.optionsMessage(es, g, "2026-10-23", "500000000000000001")
 	if o.Flags&discordgo.MessageFlagsEphemeral == 0 {
 		t.Fatal("the options are only for whoever pressed the button")
@@ -551,5 +551,78 @@ func TestPausedStatusLeavesOutTheSchedule(t *testing.T) {
 	got := b.statusMessage(es, g, es.T("status.you_paused"), "", "", true, false, 3).Content
 	if !strings.HasPrefix(got, "**Equipo** · Tienes la encuesta pausada.\n") {
 		t.Fatalf("paused status: %q", got)
+	}
+}
+
+func TestSurveySaysWhenNamesStart(t *testing.T) {
+	es := i18n.Get("es")
+	g := api.Guild{Anonymous: true}
+	if got := surveyPrivacy(es, g, "2026-11-16"); got != "🔒 Respuesta anónima" {
+		t.Fatalf("anonymous: %q", got)
+	}
+	// Turned off on Monday: Monday's survey is still anonymous and says from when it won't be.
+	g = api.Guild{Anonymous: false, NamedSince: "2026-11-17"}
+	if got := surveyPrivacy(es, g, "2026-11-16"); got != "🔒 Respuesta anónima · Con nombre desde el 17 nov" {
+		t.Fatalf("the day it was turned off: %q", got)
+	}
+	if !g.AnonymousOn("2026-11-16") || g.AnonymousOn("2026-11-17") {
+		t.Fatal("names start on NamedSince")
+	}
+	if got := surveyPrivacy(es, g, "2026-11-17"); got != "👁 Con nombre desde el 17 nov: el admin ve quién responde" {
+		t.Fatalf("the first named day: %q", got)
+	}
+	if got := surveyPrivacy(es, g, "2026-11-24"); got != "👁 El admin ve quién responde" {
+		t.Fatalf("a week later: %q", got)
+	}
+	label := noteModal(es, g, surveyID{Action: actionNote, GuildID: "1", Day: "2026-11-16", Mood: 3}).Components[0].(discordgo.ActionsRow).Components[0].(discordgo.TextInput).Label
+	if label != "Lo leen los admins, sin tu nombre" {
+		t.Fatalf("comment on the last anonymous day: %q", label)
+	}
+}
+
+func TestWithheldReport(t *testing.T) {
+	es := i18n.Get("es")
+	g := api.Guild{Name: "Equipo"}
+	r := api.Report{From: "2026-11-09", To: "2026-11-13", Anonymous: true, Withheld: true, AnonymityThreshold: 3, Responses: 4, Respondents: 2,
+		Days: []api.ReportDay{{Day: "2026-11-09", Responses: 2, Withheld: true}}}
+	m := reportMessage(es, g, r)
+	if len(m.Files) != 0 || m.Embeds[0].Image != nil {
+		t.Fatal("a withheld report has no image")
+	}
+	want := "**Personas que han respondido:** 2\nCon menos de 3 no se muestran media ni comentarios, para que nadie pueda saber quién ha dicho qué."
+	if d := m.Embeds[0].Description; d != want {
+		t.Fatalf("withheld report: %q", d)
+	}
+}
+
+func TestAnonymousCommentsHaveNoDayOrMood(t *testing.T) {
+	es := i18n.Get("es")
+	got := comments(es, []api.ReportMsg{
+		{Message: "Muchas reuniones"},
+		{Day: "2026-11-10", Mood: 4, Message: "Bien", Username: "ana", DiscordID: "1"},
+	})
+	if !strings.Contains(got, "> Muchas reuniones\n") || strings.Contains(got, "> 🙂 Muchas") {
+		t.Fatalf("anonymous comment: %q", got)
+	}
+	if !strings.Contains(got, "\n> 🙂 Bien\n-# ma 10 nov · ana") {
+		t.Fatalf("named comment: %q", got)
+	}
+}
+
+func TestMinPeopleOptions(t *testing.T) {
+	es := i18n.Get("es")
+	opts := minPeopleOptions(es, 3)
+	if opts[0].Label != "Resultados con al menos 3 personas" || !opts[0].Default || opts[0].Description != "Para equipos pequeños" {
+		t.Fatalf("first option: %+v", opts[0])
+	}
+	if opts := minPeopleOptions(es, 7); len(opts) != 7 || opts[4].Value != "7" || !opts[4].Default {
+		t.Fatalf("a threshold set elsewhere is offered: %+v", opts)
+	}
+	p, _, save, ok := setupPatch(setupID{Action: setupMinPeople, Page: "1"}, []string{"5"})
+	if !ok || !save || p.AnonymityThreshold == nil || *p.AnonymityThreshold != 5 {
+		t.Fatalf("choosing 5: %+v %v %v", p, save, ok)
+	}
+	if _, _, _, ok := setupPatch(setupID{Action: setupMinPeople, Page: "1"}, []string{"2"}); ok {
+		t.Fatal("2 is below the minimum")
 	}
 }

@@ -59,13 +59,19 @@ func New(baseURL, key string) *Client {
 }
 
 type Guild struct {
-	DiscordID       string `json:"discord_guild_id"`
-	Name            string `json:"name"`
-	AdminDiscordID  string `json:"admin_discord_user_id"`
-	Anonymous       bool   `json:"anonymous"`
-	Timezone        string `json:"timezone"`
-	SurveyHour      int    `json:"survey_hour"`
-	ReportFrequency string `json:"report_frequency"`
+	DiscordID      string `json:"discord_guild_id"`
+	Name           string `json:"name"`
+	AdminDiscordID string `json:"admin_discord_user_id"`
+	Anonymous      bool   `json:"anonymous"`
+	// NamedSince is the first day answers carry names, once anonymity was turned off: the day
+	// after. Empty while the server is anonymous, or from an older API.
+	NamedSince string `json:"named_since"`
+	// AnonymityThreshold is the fewest people whose anonymous answers a report shows beyond
+	// counts. 0 from an older API.
+	AnonymityThreshold int    `json:"anonymity_threshold"`
+	Timezone           string `json:"timezone"`
+	SurveyHour         int    `json:"survey_hour"`
+	ReportFrequency    string `json:"report_frequency"`
 	// ReportDM is false when the main admin chose to see reports only on the web. Missing (an
 	// older API) means true.
 	ReportDM *bool `json:"report_dm"`
@@ -101,6 +107,20 @@ type RoleFilter struct {
 // Everyone reports whether the filter lets every member in, as an older API's empty one does.
 func (f RoleFilter) Everyone() bool { return f.Mode != RolesOnly && f.Mode != RolesExcept }
 
+// MinAnonymityThreshold is the API's default and lowest anonymity threshold.
+const MinAnonymityThreshold = 3
+
+// Threshold is the anonymity threshold, MinAnonymityThreshold from an older API.
+func (g Guild) Threshold() int { return max(g.AnonymityThreshold, MinAnonymityThreshold) }
+
+// AnonymousOn reports whether an answer for day (YYYY-MM-DD) is anonymous: always while the
+// server is, and for the days before NamedSince once anonymity was turned off.
+func (g Guild) AnonymousOn(day string) bool { return g.Anonymous || day < g.NamedSince }
+
+// NamedSoon reports whether day's answers are anonymous but anonymity was already turned off:
+// names start the next day.
+func (g Guild) NamedSoon(day string) bool { return !g.Anonymous && day < g.NamedSince }
+
 // SendsReportDM reports whether the main admin gets the report as a DM.
 func (g Guild) SendsReportDM() bool { return g.ReportDM == nil || *g.ReportDM }
 
@@ -119,33 +139,38 @@ type Member struct {
 }
 
 type GuildPatch struct {
-	Anonymous       *bool       `json:"anonymous,omitempty"`
-	Timezone        *string     `json:"timezone,omitempty"`
-	SurveyHour      *int        `json:"survey_hour,omitempty"`
-	ReportFrequency *string     `json:"report_frequency,omitempty"`
-	AdminDiscordID  *string     `json:"admin_discord_user_id,omitempty"`
-	Language        *string     `json:"language,omitempty"`
-	KudosChannelID  *string     `json:"kudos_channel_id,omitempty"`
-	GamesEnabled    *bool       `json:"games_enabled,omitempty"`
-	WorkingDays     []int       `json:"working_days,omitempty"`
-	ReportDM        *bool       `json:"report_dm,omitempty"`
-	SurveyEnabled   *bool       `json:"survey_enabled,omitempty"`
-	SurveyRoles     *RoleFilter `json:"survey_roles,omitempty"`
-	GameRoles       *RoleFilter `json:"game_roles,omitempty"`
+	Anonymous          *bool       `json:"anonymous,omitempty"`
+	AnonymityThreshold *int        `json:"anonymity_threshold,omitempty"`
+	Timezone           *string     `json:"timezone,omitempty"`
+	SurveyHour         *int        `json:"survey_hour,omitempty"`
+	ReportFrequency    *string     `json:"report_frequency,omitempty"`
+	AdminDiscordID     *string     `json:"admin_discord_user_id,omitempty"`
+	Language           *string     `json:"language,omitempty"`
+	KudosChannelID     *string     `json:"kudos_channel_id,omitempty"`
+	GamesEnabled       *bool       `json:"games_enabled,omitempty"`
+	WorkingDays        []int       `json:"working_days,omitempty"`
+	ReportDM           *bool       `json:"report_dm,omitempty"`
+	SurveyEnabled      *bool       `json:"survey_enabled,omitempty"`
+	SurveyRoles        *RoleFilter `json:"survey_roles,omitempty"`
+	GameRoles          *RoleFilter `json:"game_roles,omitempty"`
 }
 
 type Report struct {
-	DiscordGuildID string         `json:"discord_guild_id"`
-	From           string         `json:"from"`
-	To             string         `json:"to"`
-	Anonymous      bool           `json:"anonymous"`
-	Responses      int            `json:"responses"`
-	Respondents    int            `json:"respondents"`
-	Average        float64        `json:"average"`
-	Distribution   map[string]int `json:"distribution"`
-	Days           []ReportDay    `json:"days"`
-	Messages       []ReportMsg    `json:"messages"`
-	Kudos          KudosSummary   `json:"kudos"`
+	DiscordGuildID string `json:"discord_guild_id"`
+	From           string `json:"from"`
+	To             string `json:"to"`
+	Anonymous      bool   `json:"anonymous"`
+	// Withheld: the period's anonymous answers came from fewer people than AnonymityThreshold,
+	// so only the counts are given.
+	AnonymityThreshold int            `json:"anonymity_threshold"`
+	Withheld           bool           `json:"withheld"`
+	Responses          int            `json:"responses"`
+	Respondents        int            `json:"respondents"`
+	Average            float64        `json:"average"`
+	Distribution       map[string]int `json:"distribution"`
+	Days               []ReportDay    `json:"days"`
+	Messages           []ReportMsg    `json:"messages"`
+	Kudos              KudosSummary   `json:"kudos"`
 }
 
 // KudosSummary counts the period's kudos; Highlights are the latest few, newest first.
@@ -169,8 +194,15 @@ type ReportDay struct {
 	Day       string  `json:"day"`
 	Responses int     `json:"responses"`
 	Average   float64 `json:"average"`
+	// Withheld: that day's anonymous answers came from fewer people than the threshold, so it
+	// has no average.
+	Withheld bool `json:"withheld"`
 }
 
+// Plotted reports whether the day has an average to show.
+func (d ReportDay) Plotted() bool { return d.Responses > 0 && !d.Withheld }
+
+// ReportMsg is a comment. An anonymous one has only its text: Day is empty and Mood 0.
 type ReportMsg struct {
 	Day       string `json:"day"`
 	Mood      int    `json:"mood"`

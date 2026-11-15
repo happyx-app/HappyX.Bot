@@ -348,5 +348,8 @@
   "setup.summary_off": "Keine Montagsübersicht",
   "team.channel_gone": "Den Team-Kanal gibt es nicht mehr. Wähle mit {cmd} einen anderen. Was du geschrieben hast:",
   "team.post_failed": "Discord hat das Posten nicht zugelassen. Versuch es später noch einmal. Was du geschrieben hast:",
-  "team.channel_cant": "⚠️ HappyX kann nicht in {channel} posten: Gib ihm dort «Kanal ansehen», «Nachrichten senden» und «Links einbetten»."
+  "team.channel_cant": "⚠️ HappyX kann nicht in {channel} posten: Gib ihm dort «Kanal ansehen», «Nachrichten senden» und «Links einbetten».",
+  "setup.team_same_cant": "⚠️ Derselbe Kanal: HappyX kann dort auch nicht posten.",
+  "team.told_by": "{user} hat es dem Team schon in {channel} gesagt.",
+  "team.not_yours": "Nur {user} kann es bearbeiten oder löschen: Es steht unter diesem Namen."
 }

@@ -87,9 +87,15 @@ func (b *Bot) handleTeam(ctx context.Context, i *discordgo.InteractionCreate, id
 	}
 	switch id.Action {
 	case teamTell:
-		// Told already about this period: edit that note rather than post a second one.
+		// Told already about this period: show that note, to see, edit or delete it, rather than post
+		// a second one.
 		if n, err := b.api.PeriodTeamNote(ctx, id.GuildID, id.From, id.To); err == nil && b.noteAlive(ctx, id.GuildID, n) {
-			b.respond(i, discordgo.InteractionResponseModal, teamModal(l, teamID{Action: teamEditModal, GuildID: id.GuildID, Note: n.ID}, b.channelName(n.ChannelID), n.Body))
+			if n.AuthorDiscordID != user.ID {
+				// Another admin's note: theirs to change, as it goes out under their name.
+				b.answer(i, published(l, id.GuildID, n, l.T("team.told_by", "user", "<@"+n.AuthorDiscordID+">", "channel", "<#"+n.ChannelID+">"), false))
+				return
+			}
+			b.answer(i, published(l, id.GuildID, n, l.T("team.published", "channel", "<#"+n.ChannelID+">"), true))
 			return
 		} else if err != nil && !errors.Is(err, api.ErrNotFound) {
 			b.replyError(i, l, err)
@@ -104,15 +110,15 @@ func (b *Bot) handleTeam(ctx context.Context, i *discordgo.InteractionCreate, id
 	case teamTellModal:
 		b.publishNote(ctx, i, l, g, user, id, modalValue(i.ModalSubmitData(), "body"))
 	case teamEdit:
-		n, ok := b.note(ctx, i, l, id)
+		n, ok := b.note(ctx, i, l, id, user)
 		if !ok {
 			return
 		}
 		b.respond(i, discordgo.InteractionResponseModal, teamModal(l, teamID{Action: teamEditModal, GuildID: id.GuildID, Note: n.ID}, b.channelName(n.ChannelID), n.Body))
 	case teamEditModal:
-		b.editNote(ctx, i, l, g, id, modalValue(i.ModalSubmitData(), "body"))
+		b.editNote(ctx, i, l, g, user, id, modalValue(i.ModalSubmitData(), "body"))
 	case teamDelete:
-		n, ok := b.note(ctx, i, l, id)
+		n, ok := b.note(ctx, i, l, id, user)
 		if !ok {
 			return
 		}
@@ -125,13 +131,13 @@ func (b *Bot) handleTeam(ctx context.Context, i *discordgo.InteractionCreate, id
 			AllowedMentions: &discordgo.MessageAllowedMentions{},
 		})
 	case teamDeleteOK:
-		b.deleteNote(ctx, i, l, id)
+		b.deleteNote(ctx, i, l, user, id)
 	case teamBack:
-		n, ok := b.note(ctx, i, l, id)
+		n, ok := b.note(ctx, i, l, id, user)
 		if !ok {
 			return
 		}
-		b.answer(i, published(l, id.GuildID, n, l.T("team.published", "channel", "<#"+n.ChannelID+">")))
+		b.answer(i, published(l, id.GuildID, n, l.T("team.published", "channel", "<#"+n.ChannelID+">"), true))
 	}
 }
 
@@ -146,11 +152,31 @@ func (b *Bot) answer(i *discordgo.InteractionCreate, data *discordgo.Interaction
 	b.respond(i, discordgo.InteractionResponseChannelMessageWithSource, data)
 }
 
+// noteAliveFor is how long a note's message seen alive isn't checked again; noteAliveWait how long
+// Discord gets to answer.
+const (
+	noteAliveFor  = 10 * time.Minute
+	noteAliveWait = 1500 * time.Millisecond
+)
+
 // noteAlive reports whether a note's message is still in its channel. One deleted by hand in
 // Discord is forgotten, so nothing links to it any more. When Discord doesn't say (no permission
 // to read the channel, an outage), the note is taken as alive.
+//
+// It runs while answering a survey, which must answer within Discord's 3 seconds, so Discord gets
+// a short time to say, and a message seen alive isn't asked about again for a while.
 func (b *Bot) noteAlive(ctx context.Context, guildID string, n api.TeamNote) bool {
-	if _, err := b.dg.ChannelMessage(n.ChannelID, n.MessageID); err != nil && gone(err) {
+	if seen, ok := b.aliveNotes.Load(n.ID); ok && b.now().Sub(seen.(time.Time)) < noteAliveFor {
+		return true
+	}
+	cctx, cancel := context.WithTimeout(ctx, noteAliveWait)
+	defer cancel()
+	_, err := b.dg.ChannelMessage(n.ChannelID, n.MessageID, discordgo.WithContext(cctx))
+	if err == nil {
+		b.aliveNotes.Store(n.ID, b.now())
+	}
+	if err != nil && gone(err) {
+		b.aliveNotes.Delete(n.ID)
 		if derr := b.api.DeleteTeamNote(ctx, guildID, n.ID); derr != nil && !errors.Is(derr, api.ErrNotFound) {
 			b.log.Warn("forget team note deleted in Discord", "guild", guildID, "err", derr)
 		}
@@ -179,9 +205,15 @@ func (b *Bot) managesGuild(ctx context.Context, i *discordgo.InteractionCreate, 
 	return true
 }
 
-// note reads the note a button acts on, and answers when it is gone.
-func (b *Bot) note(ctx context.Context, i *discordgo.InteractionCreate, l *i18n.Locale, id teamID) (api.TeamNote, bool) {
+// note reads the note a button acts on, and answers when it is gone or isn't the user's: a note
+// goes out under its author's name, so only they change or delete it.
+func (b *Bot) note(ctx context.Context, i *discordgo.InteractionCreate, l *i18n.Locale, id teamID, user *discordgo.User) (api.TeamNote, bool) {
 	n, err := b.api.TeamNote(ctx, id.GuildID, id.Note)
+	if err == nil && n.AuthorDiscordID != user.ID {
+		b.answer(i, &discordgo.InteractionResponseData{Content: l.T("team.not_yours", "user", "<@"+n.AuthorDiscordID+">"),
+			Components: []discordgo.MessageComponent{}, AllowedMentions: &discordgo.MessageAllowedMentions{}})
+		return n, false
+	}
 	if errors.Is(err, api.ErrNotFound) {
 		b.answer(i, &discordgo.InteractionResponseData{Content: l.T("team.gone"), Components: []discordgo.MessageComponent{}})
 		return n, false
@@ -251,16 +283,21 @@ func teamEmbed(l *i18n.Locale, n api.TeamNote) *discordgo.MessageEmbed {
 	}
 }
 
-// published is the private answer once the note is in the channel: where, a link to it, and
-// buttons to edit or delete it.
-func published(l *i18n.Locale, guildID string, n api.TeamNote, text string) *discordgo.InteractionResponseData {
-	return &discordgo.InteractionResponseData{
-		Content: text,
-		Components: []discordgo.MessageComponent{discordgo.ActionsRow{Components: []discordgo.MessageComponent{
-			discordgo.Button{Label: l.T("team.see_button"), Style: discordgo.LinkButton, URL: messageLink(guildID, n.ChannelID, n.MessageID)},
+// published is the private answer once the note is in the channel: where, a link to it, and,
+// for its author, buttons to edit or delete it.
+func published(l *i18n.Locale, guildID string, n api.TeamNote, text string, own bool) *discordgo.InteractionResponseData {
+	row := []discordgo.MessageComponent{
+		discordgo.Button{Label: l.T("team.see_button"), Style: discordgo.LinkButton, URL: messageLink(guildID, n.ChannelID, n.MessageID)},
+	}
+	if own {
+		row = append(row,
 			discordgo.Button{Label: l.T("team.edit_button"), Style: discordgo.SecondaryButton, CustomID: teamID{Action: teamEdit, GuildID: guildID, Note: n.ID}.String()},
 			discordgo.Button{Label: l.T("team.delete_button"), Style: discordgo.SecondaryButton, CustomID: teamID{Action: teamDelete, GuildID: guildID, Note: n.ID}.String()},
-		}}},
+		)
+	}
+	return &discordgo.InteractionResponseData{
+		Content:         text,
+		Components:      []discordgo.MessageComponent{discordgo.ActionsRow{Components: row}},
 		Flags:           discordgo.MessageFlagsEphemeral,
 		AllowedMentions: &discordgo.MessageAllowedMentions{},
 	}
@@ -302,12 +339,12 @@ func (b *Bot) publishNote(ctx context.Context, i *discordgo.InteractionCreate, l
 		b.ephemeral(i, l.T("error.generic")+"\n"+quote(body))
 		return
 	}
-	b.respond(i, discordgo.InteractionResponseChannelMessageWithSource, published(l, g.DiscordID, saved, l.T("team.published", "channel", "<#"+channel+">")))
+	b.respond(i, discordgo.InteractionResponseChannelMessageWithSource, published(l, g.DiscordID, saved, l.T("team.published", "channel", "<#"+channel+">"), true))
 }
 
 // editNote changes the message in the channel, then the note.
-func (b *Bot) editNote(ctx context.Context, i *discordgo.InteractionCreate, l *i18n.Locale, g api.Guild, id teamID, body string) {
-	n, ok := b.note(ctx, i, l, id)
+func (b *Bot) editNote(ctx context.Context, i *discordgo.InteractionCreate, l *i18n.Locale, g api.Guild, user *discordgo.User, id teamID, body string) {
+	n, ok := b.note(ctx, i, l, id, user)
 	if !ok {
 		return
 	}
@@ -328,12 +365,12 @@ func (b *Bot) editNote(ctx context.Context, i *discordgo.InteractionCreate, l *i
 		b.replyError(i, l, err)
 		return
 	}
-	b.answer(i, published(l, g.DiscordID, saved, l.T("team.edited", "channel", "<#"+n.ChannelID+">")))
+	b.answer(i, published(l, g.DiscordID, saved, l.T("team.edited", "channel", "<#"+n.ChannelID+">"), true))
 }
 
 // deleteNote takes the message out of the channel, then forgets the note.
-func (b *Bot) deleteNote(ctx context.Context, i *discordgo.InteractionCreate, l *i18n.Locale, id teamID) {
-	n, ok := b.note(ctx, i, l, id)
+func (b *Bot) deleteNote(ctx context.Context, i *discordgo.InteractionCreate, l *i18n.Locale, user *discordgo.User, id teamID) {
+	n, ok := b.note(ctx, i, l, id, user)
 	if !ok {
 		return
 	}

@@ -31,6 +31,8 @@ type Bot struct {
 	// skip holds, per guild, kind and period, until when the scheduler won't ask the API to
 	// claim it again: sent or claimed elsewhere, or waiting to retry. Only tick uses it.
 	skip map[string]time.Time
+	// aliveNotes holds, per team note ID, when its message was last seen in its channel.
+	aliveNotes sync.Map
 
 	commandID atomic.Pointer[string] // /happyx's ID once registered, for clickable mentions
 

@@ -348,6 +348,9 @@
   "setup.summary_on_desc": "Game, kudos and how many answered, if at least {k} did. Never the mood.",
   "setup.summary_off": "No Monday summary",
   "team.channel_gone": "The team channel no longer exists. Pick another with {cmd}. What you wrote:",
-  "team.post_failed": "Discord didn't let it be posted. Try again in a while. What you wrote:",
-  "team.channel_cant": "⚠️ HappyX can't post in {channel}: give it «View Channel», «Send Messages» and «Embed Links» there."
+  "team.post_failed": "Discord didn't accept the post. Try again in a while. What you wrote:",
+  "team.channel_cant": "⚠️ HappyX can't post in {channel}: give it «View Channel», «Send Messages» and «Embed Links» there.",
+  "setup.team_same_cant": "⚠️ Same channel: HappyX can't post there either.",
+  "team.told_by": "{user} already told the team in {channel}.",
+  "team.not_yours": "Only {user} can edit or delete it: it was posted under their name."
 }

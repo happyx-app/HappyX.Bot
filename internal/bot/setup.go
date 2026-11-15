@@ -191,14 +191,18 @@ func setupComponents(l *i18n.Locale, d setupData, page string) []discordgo.Messa
 			text("**"+l.T("setup.team")+"**\n-# "+l.T("setup.team_desc")),
 			sel(setupTeam, l.T("setup.team"), teamOptions(l, d.Channels, g)),
 		)
-		if ch, ok := findChannel(d.Channels, g.TeamChannel()); ok && !ch.CanPost {
-			c = append(c, text(l.T("setup.kudos_cant", "channel", ch.Name)))
-		}
 		if g.TeamChannel() != "" {
 			c = append(c, sel(setupSummary, l.T("setup.team"), []discordgo.SelectMenuOption{
 				{Label: l.T("setup.summary_on"), Description: l.T("setup.summary_on_desc", "k", max(summaryMinPeople, g.Threshold())), Value: "yes", Default: g.TeamSummary},
 				{Label: l.T("setup.summary_off"), Value: "no", Default: !g.TeamSummary},
 			}))
+		}
+		if ch, ok := findChannel(d.Channels, g.TeamChannel()); ok && !ch.CanPost {
+			if ch.ID == g.KudosChannelID { // the kudos channel, warned about just above
+				c = append(c, text(l.T("setup.team_same_cant")))
+			} else {
+				c = append(c, text(l.T("setup.kudos_cant", "channel", ch.Name)))
+			}
 		}
 		c = append(c, label(l.T("setup.game")), sel(setupGames, l.T("setup.game"), []discordgo.SelectMenuOption{
 			{Label: l.T("setup.game_off"), Value: "no", Default: !g.GamesEnabled},

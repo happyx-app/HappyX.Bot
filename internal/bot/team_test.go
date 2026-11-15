@@ -264,7 +264,8 @@ func TestWithTold(t *testing.T) {
 	defer func(old string) { discordgo.EndpointChannels = old }(discordgo.EndpointChannels)
 	discordgo.EndpointChannels = srv.URL + "/discord/channels/"
 	dg, _ := discordgo.New("Bot x")
-	b := &Bot{api: api.New(srv.URL, "key"), dg: dg, log: slog.New(slog.NewTextHandler(io.Discard, nil)), now: time.Now}
+	clock := time.Date(2026, 11, 16, 12, 0, 0, 0, time.UTC)
+	b := &Bot{api: api.New(srv.URL, "key"), dg: dg, log: slog.New(slog.NewTextHandler(io.Discard, nil)), now: func() time.Time { return clock }}
 	es := i18n.Get("es")
 	id := surveyID{GuildID: "100000000000000001", Day: "2026-11-16", Mood: 4}
 	buttons := func() []discordgo.MessageComponent {
@@ -283,6 +284,10 @@ func TestWithTold(t *testing.T) {
 	}
 
 	msgGone = true
+	if row := buttons(); len(row) != 3 {
+		t.Fatalf("a message seen alive minutes ago isn't asked about again: %+v", row)
+	}
+	clock = clock.Add(noteAliveFor + time.Minute)
 	if row := buttons(); len(row) != 2 {
 		t.Fatalf("a message deleted in Discord gets no link: %+v", row)
 	}
@@ -293,5 +298,18 @@ func TestWithTold(t *testing.T) {
 	msgGone, note = false, false
 	if row := buttons(); len(row) != 2 {
 		t.Fatalf("without a note the card keeps its 2 buttons: %+v", row)
+	}
+}
+
+// Only a note's author gets the buttons to edit or delete it: it goes out under their name.
+func TestPublishedButtons(t *testing.T) {
+	es := i18n.Get("es")
+	n := api.TeamNote{ID: 4, AuthorDiscordID: "300000000000000001", ChannelID: "200000000000000001", MessageID: "400000000000000001"}
+	if row := published(es, "100000000000000001", n, "x", true).Components[0].(discordgo.ActionsRow).Components; len(row) != 3 {
+		t.Errorf("the author sees, edits and deletes: %+v", row)
+	}
+	row := published(es, "100000000000000001", n, "x", false).Components[0].(discordgo.ActionsRow).Components
+	if len(row) != 1 || row[0].(discordgo.Button).Style != discordgo.LinkButton {
+		t.Errorf("another admin only sees the message: %+v", row)
 	}
 }

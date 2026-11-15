@@ -348,5 +348,8 @@
   "setup.summary_off": "Nessun riepilogo del lunedì",
   "team.channel_gone": "Il canale del team non esiste più. Scegline un altro con {cmd}. Quello che hai scritto:",
   "team.post_failed": "Discord non ha permesso di pubblicarlo. Riprova tra poco. Quello che hai scritto:",
-  "team.channel_cant": "⚠️ HappyX non può pubblicare in {channel}: dagli «Visualizzare il canale», «Inviare messaggi» e «Incorporare link» in quel canale."
+  "team.channel_cant": "⚠️ HappyX non può pubblicare in {channel}: dagli «Visualizzare il canale», «Inviare messaggi» e «Incorporare link» in quel canale.",
+  "setup.team_same_cant": "⚠️ È lo stesso canale: HappyX non può pubblicare neanche lì.",
+  "team.told_by": "{user} l'ha già detto al team in {channel}.",
+  "team.not_yours": "Solo {user} può modificarlo o eliminarlo: è pubblicato con il suo nome."
 }

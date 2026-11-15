@@ -144,7 +144,8 @@ func Previews(code string) []Preview {
 		{Title: "Weekly report when no day reached the threshold", Channel: "DM", Msg: reportMessage(l, g, previewWithheld())},
 		{Title: "Weekly report (with the week before, «Tell the team» and the dashboard)", Channel: "DM", Msg: reportMessageWith(l, g, withAudience, reportOptions{
 			Tell: true, DashboardURL: "https://happyx.example.com/#/g/" + PreviewGuildID + "?p=last-week", Previous: &prevWeek})},
-		{Title: "«Tell the team» published", Channel: "DM", Ephemeral: true, Msg: data(published(l, g.DiscordID, note, l.T("team.published", "channel", "<#"+PreviewChannelID+">")))},
+		{Title: "«Tell the team» published", Channel: "DM", Ephemeral: true, Msg: data(published(l, g.DiscordID, note, l.T("team.published", "channel", "<#"+PreviewChannelID+">"), true))},
+		{Title: "«Tell the team» pressed by another admin once alex told the team", Channel: "DM", Ephemeral: true, Msg: data(published(l, g.DiscordID, note, l.T("team.told_by", "user", "<@"+PreviewAdminID+">", "channel", "<#"+PreviewChannelID+">"), false))},
 		{Title: "What the team sees", Channel: "#kudos", Msg: teamCard(l, note)},
 		{Title: "After answering, the survey day after an admin told the team", Channel: "DM", Msg: data(told)},
 		{Title: "Monday summary", Channel: "#kudos", Msg: teamSummary(l, games, week, summaryReport, &api.GameRound{Week: week, Question: question, Phase: "finished", Answers: 7, MinAnswers: 4}, gameLink+"?history")},

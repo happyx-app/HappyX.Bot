@@ -342,9 +342,12 @@
   "setup.team_kudos": "El de kudos ({channel})",
   "setup.team_none": "Cap",
   "setup.summary_on": "Resum del dilluns",
-  "setup.summary_on_desc": "Joc, kudos i quants han respost, si són almenys {k}. Mai l’ànim.",
+  "setup.summary_on_desc": "Joc, kudos i quants han respost, si són almenys {k}. Mai l'ànim.",
   "setup.summary_off": "Sense resum del dilluns",
-  "team.channel_gone": "El canal de l’equip ja no existeix. Tria’n un altre amb {cmd}. El que vas escriure:",
-  "team.post_failed": "Discord no ha deixat publicar-ho. Torna-ho a provar d’aquí a una estona. El que vas escriure:",
-  "team.channel_cant": "⚠️ HappyX no pot publicar a {channel}: dona-li «Veure el canal», «Enviar missatges» i «Inserir enllaços» en aquest canal."
+  "team.channel_gone": "El canal de l'equip ja no existeix. Tria'n un altre amb {cmd}. El que vas escriure:",
+  "team.post_failed": "Discord no ha deixat publicar-ho. Torna-ho a provar d'aquí a una estona. El que vas escriure:",
+  "team.channel_cant": "⚠️ HappyX no pot publicar a {channel}: dona-li «Veure el canal», «Enviar missatges» i «Inserir enllaços» en aquest canal.",
+  "setup.team_same_cant": "⚠️ És el mateix canal: HappyX tampoc hi pot publicar.",
+  "team.told_by": "{user} ja ho va explicar a {channel}.",
+  "team.not_yours": "Només {user} ho pot editar o esborrar: ho va publicar amb el seu nom."
 }

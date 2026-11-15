@@ -350,6 +350,6 @@
   "team.post_failed": "Discord n’a pas permis de le publier. Réessaie dans un moment. Ce que tu as écrit :",
   "team.channel_cant": "⚠️ HappyX ne peut pas publier dans {channel} : donne-lui «Voir le salon», «Envoyer des messages» et «Intégrer des liens» dans ce salon.",
   "setup.team_same_cant": "⚠️ C'est le même salon : HappyX ne peut pas y publier non plus.",
-  "team.told_by": "{user} l'a déjà dit à l'équipe dans {channel}.",
-  "team.not_yours": "Seul·e {user} peut le modifier ou le supprimer : c'est publié sous son nom."
+  "team.told_by": "{user} l'a déjà dit à l'équipe dans {channel}. Seule la personne qui l'a publié peut le modifier ou le supprimer.",
+  "team.not_yours": "Seule la personne qui l'a publié, {user}, peut le modifier ou le supprimer : c'est publié sous son nom."
 }

@@ -351,6 +351,6 @@
   "team.post_failed": "Discord didn't accept the post. Try again in a while. What you wrote:",
   "team.channel_cant": "⚠️ HappyX can't post in {channel}: give it «View Channel», «Send Messages» and «Embed Links» there.",
   "setup.team_same_cant": "⚠️ Same channel: HappyX can't post there either.",
-  "team.told_by": "{user} already told the team in {channel}.",
+  "team.told_by": "{user} already told the team in {channel}. Only whoever posted it can edit or delete it.",
   "team.not_yours": "Only {user} can edit or delete it: it was posted under their name."
 }

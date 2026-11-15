@@ -350,6 +350,6 @@
   "team.post_failed": "Discord non ha permesso di pubblicarlo. Riprova tra poco. Quello che hai scritto:",
   "team.channel_cant": "⚠️ HappyX non può pubblicare in {channel}: dagli «Visualizzare il canale», «Inviare messaggi» e «Incorporare link» in quel canale.",
   "setup.team_same_cant": "⚠️ È lo stesso canale: HappyX non può pubblicare neanche lì.",
-  "team.told_by": "{user} l'ha già detto al team in {channel}.",
+  "team.told_by": "{user} l'ha già detto al team in {channel}. Solo chi l'ha pubblicato può modificarlo o eliminarlo.",
   "team.not_yours": "Solo {user} può modificarlo o eliminarlo: è pubblicato con il suo nome."
 }

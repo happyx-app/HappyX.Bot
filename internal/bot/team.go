@@ -166,8 +166,11 @@ const (
 // It runs while answering a survey, which must answer within Discord's 3 seconds, so Discord gets
 // a short time to say, and a message seen alive isn't asked about again for a while.
 func (b *Bot) noteAlive(ctx context.Context, guildID string, n api.TeamNote) bool {
-	if seen, ok := b.aliveNotes.Load(n.ID); ok && b.now().Sub(seen.(time.Time)) < noteAliveFor {
-		return true
+	if seen, ok := b.aliveNotes.Load(n.ID); ok {
+		if b.now().Sub(seen.(time.Time)) < noteAliveFor {
+			return true
+		}
+		b.aliveNotes.Delete(n.ID)
 	}
 	cctx, cancel := context.WithTimeout(ctx, noteAliveWait)
 	defer cancel()
@@ -330,6 +333,16 @@ func (b *Bot) publishNote(ctx context.Context, i *discordgo.InteractionCreate, l
 	}
 	n.MessageID = m.ID
 	saved, err := b.api.PublishTeamNote(ctx, g.DiscordID, n)
+	if errors.Is(err, api.ErrConflict) {
+		// Another admin told the team about this period a moment ago: one note per period.
+		if derr := b.dg.ChannelMessageDelete(channel, m.ID); derr != nil {
+			b.log.Warn("take back second team note", "guild", g.DiscordID, "err", derr)
+		}
+		if first, ferr := b.api.PeriodTeamNote(ctx, g.DiscordID, id.From, id.To); ferr == nil {
+			b.answer(i, published(l, g.DiscordID, first, l.T("team.told_by", "user", "<@"+first.AuthorDiscordID+">", "channel", "<#"+first.ChannelID+">")+"\n"+quote(body), first.AuthorDiscordID == user.ID))
+			return
+		}
+	}
 	if err != nil {
 		// Unrecorded, it could be neither edited nor deleted from here: take it back.
 		if derr := b.dg.ChannelMessageDelete(channel, m.ID); derr != nil {

@@ -348,6 +348,6 @@
   "team.post_failed": "Discord no ha deixat publicar-ho. Torna-ho a provar d'aquí a una estona. El que vas escriure:",
   "team.channel_cant": "⚠️ HappyX no pot publicar a {channel}: dona-li «Veure el canal», «Enviar missatges» i «Inserir enllaços» en aquest canal.",
   "setup.team_same_cant": "⚠️ És el mateix canal: HappyX tampoc hi pot publicar.",
-  "team.told_by": "{user} ja ho va explicar a {channel}.",
+  "team.told_by": "{user} ja ho va explicar a {channel}. Només qui ho va publicar ho pot editar o esborrar.",
   "team.not_yours": "Només {user} ho pot editar o esborrar: ho va publicar amb el seu nom."
 }

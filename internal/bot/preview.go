@@ -123,6 +123,7 @@ func Previews(code string) []Preview {
 		{Title: "Vacation an admin set on the web", Channel: "DM", Msg: text(l.T("vacation.notice", "admin", "<@"+PreviewAdminID+">", "server", g.Name,
 			"from", discordDate("2026-12-20"), "to", discordDate("2027-01-06"), "link", "<https://happyx.example.com/#/me>"))},
 		{Title: "Weekly report", Channel: "DM", Msg: reportMessage(l, g, previewReport())},
+		{Title: "Weekly report with a day below the threshold", Channel: "DM", Msg: reportMessage(l, g, previewPartlyWithheld())},
 		{Title: "Weekly report when no day reached the threshold", Channel: "DM", Msg: reportMessage(l, g, previewWithheld())},
 		{Title: "Setting the fewest people", Channel: "#general", Command: "/happyx config min_people:5", Ephemeral: true,
 			Msg: text(configSaved(l, fivePeople, api.GuildPatch{AnonymityThreshold: &five}))},
@@ -222,6 +223,17 @@ func previewReport() api.Report {
 	for i, avg := range []float64{3.2, 2.9, 3.8, 4.3, 4.1} {
 		r.Days = append(r.Days, api.ReportDay{Day: fmt.Sprintf("2026-10-%d", 19+i), Average: avg, Responses: 8})
 	}
+	return r
+}
+
+// previewPartlyWithheld is the weekly report where only two people answered on Tuesday: that
+// day counts only in the answers, not in the average, the distribution or the comments.
+func previewPartlyWithheld() api.Report {
+	r := previewReport()
+	r.Days[1] = api.ReportDay{Day: r.Days[1].Day, Responses: 2, Withheld: true}
+	r.Responses = 34
+	r.Distribution = map[string]int{"1": 1, "2": 3, "3": 8, "4": 13, "5": 7}
+	r.Average = 3.7
 	return r
 }
 

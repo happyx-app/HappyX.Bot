@@ -371,7 +371,7 @@
   "dm.pick_placeholder": "Tria un servidor",
   "dm.not_there": "Ja no ets en aquest servidor.",
   "game.in_survey_guess": "🎲 **Qui és qui?** {count} companys han respost a «{question}». Endevina qui ha escrit cada resposta, fins diumenge.",
-  "game.in_survey_propose": "🎲 **Qui és qui?** Aquesta setmana han respost poques persones per jugar. Proposa una pregunta per a la setmana que ve, fins diumenge.",
+  "game.in_survey_propose": "🎲 **Qui és qui?** Aquesta setmana no ha respost prou gent per jugar. Proposa una pregunta per a la setmana que ve, fins diumenge.",
   "team.closed_dms": "⚠️ {count} persones tenen tancats els missatges privats i no van rebre l'última enquesta. Tria un canal de l'equip amb {config_cmd} perquè hi puguin respondre.",
   "team.closed_dms_one": "⚠️ 1 persona té tancats els missatges privats i no va rebre l'última enquesta. Tria un canal de l'equip amb {config_cmd} perquè hi pugui respondre.",
   "dm.paused_here": "Pausada",

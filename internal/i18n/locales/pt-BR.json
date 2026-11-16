@@ -373,7 +373,7 @@
   "dm.pick_placeholder": "Escolha um servidor",
   "dm.not_there": "Você não está mais nesse servidor.",
   "game.in_survey_guess": "🎲 **Quem é quem?** {count} colegas responderam «{question}». Adivinhe quem escreveu cada resposta, até domingo.",
-  "game.in_survey_propose": "🎲 **Quem é quem?** Pouca gente respondeu esta semana para jogar. Proponha uma pergunta para a próxima semana, até domingo.",
+  "game.in_survey_propose": "🎲 **Quem é quem?** Não respondeu gente suficiente esta semana para jogar. Proponha uma pergunta para a próxima semana, até domingo.",
   "team.closed_dms": "⚠️ {count} pessoas estão com as mensagens diretas fechadas e não receberam a última pesquisa. Escolha um canal da equipe com {config_cmd} para que possam responder lá.",
   "team.closed_dms_one": "⚠️ 1 pessoa está com as mensagens diretas fechadas e não recebeu a última pesquisa. Escolha um canal da equipe com {config_cmd} para que possa responder lá.",
   "dm.paused_here": "Pausada",

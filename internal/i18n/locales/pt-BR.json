@@ -246,7 +246,7 @@
   "intro.who_all": "todos",
   "intro.who_except": "todos menos {roles}",
   "intro.and": " e ",
-  "intro.anonymous": "**🔒 É anônimo.** {admin} vê médias e comentários, nunca os nomes.",
+  "intro.anonymous": "**🔒 É anônimo.** {admin} vê o humor e os comentários da equipe, nunca os nomes.",
   "intro.named": "**👁 Com nome.** {admin} vê quem respondeu o quê.",
   "intro.game": "🎲 Toda semana tem também o jogo «Quem é quem?».",
   "intro.pause": "Se não quiserem receber, usem {cmd}.",

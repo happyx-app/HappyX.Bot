@@ -244,7 +244,7 @@
   "intro.who_all": "tots",
   "intro.who_except": "tots menys {roles}",
   "intro.and": " i ",
-  "intro.anonymous": "**🔒 És anònim.** {admin} veu mitjanes i comentaris, mai els noms.",
+  "intro.anonymous": "**🔒 És anònim.** {admin} veu l'estat d'ànim i els comentaris de l'equip, mai els noms.",
   "intro.named": "**👁 Amb nom.** {admin} veu qui ha respost què.",
   "intro.game": "🎲 Cada setmana, a més, el joc «Qui és qui?».",
   "intro.pause": "Si no la voleu rebre, feu servir {cmd}.",

@@ -422,9 +422,9 @@ func withheldDays(l *i18n.Locale, r api.Report) string {
 	return b.String()
 }
 
-// comments lists the comments as quotes, stopping at the budget with a count of the rest. An
-// anonymous comment is only its text, in the order the API gives (unrelated to when it was
-// written); a named one has its mood, day and author.
+// comments lists the comments as quotes with their mood and day, and their author when it is
+// shown, stopping at the budget with a count of the rest. A comment without a day (from an API
+// that still left it out of anonymous ones) is only its text.
 func comments(l *i18n.Locale, msgs []api.ReportMsg) string {
 	if len(msgs) == 0 {
 		return ""

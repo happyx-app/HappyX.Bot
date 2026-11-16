@@ -651,12 +651,18 @@ func TestLowThresholdIsSaid(t *testing.T) {
 		t.Fatalf("default: %d %q", g.Threshold(), surveyPrivacy(es, g, "2026-11-16"))
 	}
 	g.AnonymityThreshold = 1
-	if got := surveyPrivacy(es, g, "2026-11-16"); got != "🔒 Respuesta sin tu nombre · Los admins la ven aunque respondas solo tú" {
+	if got := surveyPrivacy(es, g, "2026-11-16"); got != "👁 Respuesta sin tu nombre · Los admins la ven aunque respondas solo tú" {
 		t.Fatalf("survey footer at 1: %q", got)
 	}
 	if got := privacyLine(es, g, "2026-11-16"); !strings.Contains(got, "aunque respondas solo tú") {
 		t.Fatalf("status at 1: %q", got)
 	}
+	// Lowered today: it counts from tomorrow, so today's survey still says anonymous.
+	g.ThresholdSince, g.ThresholdBefore = "2026-11-17", 3
+	if surveyPrivacy(es, g, "2026-11-16") != "🔒 Respuesta anónima" || !strings.HasPrefix(surveyPrivacy(es, g, "2026-11-17"), "👁") {
+		t.Fatalf("lowered today: %q / %q", surveyPrivacy(es, g, "2026-11-16"), surveyPrivacy(es, g, "2026-11-17"))
+	}
+	g.ThresholdSince, g.ThresholdBefore = "", 0
 	g.AnonymityThreshold = 2
 	if got := privacyLine(es, g, "2026-11-16"); !strings.Contains(got, "al menos 2 personas") || !strings.Contains(got, "sabrá qué respondió la otra") {
 		t.Fatalf("status at 2: %q", got)

@@ -19,6 +19,9 @@ type Preview struct {
 	Command   string // the slash command that triggered it, if any
 	Ephemeral bool   // only the user who ran the command sees it
 	Msg       *discordgo.MessageSend
+	// OpenSelect shows the select with this placeholder open, with its options and their
+	// descriptions, as Discord does once it is clicked.
+	OpenSelect string
 }
 
 // Sample IDs and names used by the previews. cmd/preview shows these IDs as names.
@@ -258,6 +261,8 @@ func setupPreviews(l *i18n.Locale, g api.Guild) []Preview {
 	named.Anonymous = false
 	onePersonIntro := page2.Guild
 	onePersonIntro.AnonymityThreshold = 1
+	onePersonSetup := d
+	onePersonSetup.Guild.AnonymityThreshold = 1
 	who := joinAnd(l, []string{"Desarrollo", "Diseño"})
 	pause := "`/happyx " + cmdPause + "`"
 	test := (&Bot{now: func() time.Time { return now }}).testSurveyFor(l, g, surveyRecipient{ID: PreviewAnaID, Name: "Ana"}, PreviewGuildIcon)
@@ -265,6 +270,7 @@ func setupPreviews(l *i18n.Locale, g api.Guild) []Preview {
 
 	return []Preview{
 		{Title: "Setup assistant, page 1 (DM to the owner when the bot joins)", Channel: "DM", Msg: v2(setupComponents(l, d, "1"))},
+		{Title: "Setup: choosing the fewest people (results even if 1 person answers)", Channel: "DM", Msg: v2(setupComponents(l, onePersonSetup, "1")), OpenSelect: l.T("setup.min_people")},
 		{Title: "Setup: picking roles for «Only these roles»", Channel: "DM", Msg: v2(setupComponents(l, picking, "1o"))},
 		{Title: "Setup: only some roles get the survey", Channel: "DM", Msg: v2(setupComponents(l, only, "1"))},
 		{Title: "Setup, page 2 (kudos channel without permission, game on)", Channel: "DM", Msg: v2(setupComponents(l, page2, "2"))},

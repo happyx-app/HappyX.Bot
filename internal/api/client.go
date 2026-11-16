@@ -69,6 +69,10 @@ type Guild struct {
 	// AnonymityThreshold is the fewest people whose anonymous answers a report shows beyond
 	// counts. 0 from an older API.
 	AnonymityThreshold int    `json:"anonymity_threshold"`
+	// A lowered threshold counts from ThresholdSince (YYYY-MM-DD, the day after it was lowered);
+	// answers for earlier days keep ThresholdBefore. Both empty otherwise.
+	ThresholdSince  string `json:"anonymity_threshold_since,omitempty"`
+	ThresholdBefore int    `json:"anonymity_threshold_before,omitempty"`
 	Timezone           string `json:"timezone"`
 	SurveyHour         int    `json:"survey_hour"`
 	ReportFrequency    string `json:"report_frequency"`
@@ -128,6 +132,15 @@ func (g Guild) Threshold() int {
 		return DefaultAnonymityThreshold
 	}
 	return g.AnonymityThreshold
+}
+
+// ThresholdOn is the anonymity threshold an answer for day (YYYY-MM-DD) is given under: the
+// current one, or the one before a lowering that only counts from ThresholdSince.
+func (g Guild) ThresholdOn(day string) int {
+	if g.ThresholdSince != "" && day < g.ThresholdSince {
+		return max(g.Threshold(), g.ThresholdBefore)
+	}
+	return g.Threshold()
 }
 
 // AnonymousOn reports whether an answer for day (YYYY-MM-DD) is anonymous: always while the

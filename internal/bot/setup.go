@@ -919,6 +919,7 @@ func minPeopleOptions(l *i18n.Locale, current int) []discordgo.SelectMenuOption 
 		switch {
 		case k < api.SafeAnonymityThreshold:
 			o.Description = l.T("setup.min_people_risky")
+			o.Emoji = &discordgo.ComponentEmoji{Name: "⚠️"}
 		case k == api.SafeAnonymityThreshold:
 			o.Description = l.T("setup.min_people_small")
 		}

@@ -82,12 +82,13 @@ func privacyLine(l *i18n.Locale, g api.Guild, day string) string {
 	case g.NamedSoon(day):
 		return l.T("options.anonymous_today", "date", shortDate(l, g.NamedSince))
 	case g.AnonymousOn(day):
-		// Members are told their answer is anonymous at any minimum: their name is never shown.
-		// With a minimum of 1 the text can't say «at least 1 people», so it says each day's.
-		if k := g.ThresholdOn(day); k > 1 {
-			return l.T("options.anonymous", "k", k)
+		// Members are told their answer is anonymous at any minimum, since their name is never
+		// shown. Below the safe minimum it says only that, not «never who answered what».
+		k := g.ThresholdOn(day)
+		if k < api.SafeAnonymityThreshold {
+			return l.T(byThreshold("options.anonymous", k))
 		}
-		return l.T("options.anonymous_k1")
+		return l.T("options.anonymous", "k", k)
 	}
 	return l.T("options.named")
 }

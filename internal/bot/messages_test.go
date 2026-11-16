@@ -657,20 +657,20 @@ func TestLowThresholdStaysAnonymousForMembers(t *testing.T) {
 		if got := surveyPrivacy(es, g, "2026-11-16"); got != "🔒 Respuesta anónima" {
 			t.Fatalf("survey footer at %d: %q", k, got)
 		}
-		if got := privacyLine(es, g, "2026-11-16"); !strings.HasPrefix(got, "🔒 Anónima") || !strings.Contains(got, "nunca quién ha respondido qué") {
+		if got := privacyLine(es, g, "2026-11-16"); !strings.HasPrefix(got, "🔒 Anónima") || !strings.HasSuffix(got, "Nunca ven tu nombre.") {
 			t.Fatalf("options at %d: %q", k, got)
 		}
 		intro := fmt.Sprint(introComponents(es, g, "todo el servidor", "alex", "/happyx pausar"))
-		if !strings.Contains(intro, "🔒 Es anónimo.") || strings.Contains(intro, "al menos") {
+		if !strings.Contains(intro, "🔒 Es anónimo.") || strings.Contains(intro, "al menos") || strings.Contains(intro, "quién ha respondido") {
 			t.Fatalf("intro at %d should be anonymous and not name the minimum: %s", k, intro)
 		}
 		kk := k
-		if got := configSaved(es, g, api.GuildPatch{AnonymityThreshold: &kk}, 3); !strings.Contains(got, "Para el equipo sigue siendo anónimo") {
+		if got := configSaved(es, g, api.GuildPatch{AnonymityThreshold: &kk}, 3); !strings.Contains(got, "La encuesta sigue diciendo al equipo que es anónima") {
 			t.Fatalf("config at %d warns the admin: %q", k, got)
 		}
 	}
 	g.AnonymityThreshold = 1
-	if got := privacyLine(es, g, "2026-11-16"); !strings.Contains(got, "aunque respondas solo tú") {
+	if got := privacyLine(es, g, "2026-11-16"); !strings.Contains(got, "también si respondes solo tú") {
 		t.Fatalf("options at 1: %q", got)
 	}
 	g.AnonymityThreshold = 2

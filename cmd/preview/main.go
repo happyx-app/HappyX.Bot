@@ -158,7 +158,7 @@ func writeComponents(b *strings.Builder, components []discordgo.MessageComponent
 					var chosen []string
 					for _, o := range rc.Options {
 						if o.Default {
-							chosen = append(chosen, html.EscapeString(o.Label))
+							chosen = append(chosen, html.EscapeString(optionLabel(o)))
 						}
 					}
 					text, class := strings.Join(chosen, ", "), "select"
@@ -169,7 +169,7 @@ func writeComponents(b *strings.Builder, components []discordgo.MessageComponent
 					if openSelect != "" && rc.Placeholder == openSelect {
 						b.WriteString(`</div><div class="menu">`)
 						for _, o := range rc.Options {
-							fmt.Fprintf(b, "<div class=\"opt%s\">%s", map[bool]string{true: " on"}[o.Default], html.EscapeString(o.Label))
+							fmt.Fprintf(b, "<div class=\"opt%s\">%s", map[bool]string{true: " on"}[o.Default], html.EscapeString(optionLabel(o)))
 							if o.Description != "" {
 								fmt.Fprintf(b, "<small>%s</small>", html.EscapeString(o.Description))
 							}
@@ -311,3 +311,11 @@ code{background:#2b2d31;border-radius:4px;padding:0 3px;font-size:14px}
 .ephemeral{font-size:12px;color:#949ba4;margin-top:4px}.ephemeral u{color:#00a8fc;text-decoration:none}
 </style></head><body>
 `
+
+// optionLabel is a select option's label with its emoji in front, as Discord draws it.
+func optionLabel(o discordgo.SelectMenuOption) string {
+	if o.Emoji != nil && o.Emoji.Name != "" {
+		return o.Emoji.Name + " " + o.Label
+	}
+	return o.Label
+}

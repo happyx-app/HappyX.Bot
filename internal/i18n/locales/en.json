@@ -274,7 +274,7 @@
   "options.text": "**{guild}** · {schedule}",
   "options.schedule": "{days} at {hour}:00 ({timezone}).",
   "options.anonymous": "🔒 Anonymous: admins see averages and comments for days when at least {k} people answer, never who answered what.",
-  "options.anonymous_k1": "🔒 Anonymous: admins see each day's mood and comments, also if you're the only one who answers. They never see your name.",
+  "options.anonymous_k1": "🔒 Anonymous: admins see each day's mood and comments, even if you're the only one who answers. They never see your name.",
   "options.anonymous_k2": "🔒 Anonymous: admins see averages and comments for days when at least 2 people answer. They never see your name.",
   "options.anonymous_today": "🔒 Anonymous today. From {date}, admins will see who answers what. What you answered before stays anonymous.",
   "options.named": "👁 With names: admins see who answered what.",

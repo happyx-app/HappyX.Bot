@@ -274,7 +274,7 @@
   "options.text": "**{guild}** · {schedule}",
   "options.schedule": "{days} a las {hour}:00 ({timezone}).",
   "options.anonymous": "🔒 Anónima: los admins ven medias y comentarios de los días en que responden al menos {k} personas, nunca quién ha respondido qué.",
-  "options.anonymous_k1": "🔒 Anónima: los admins ven el ánimo y los comentarios de cada día, también si respondes solo tú. Nunca ven tu nombre.",
+  "options.anonymous_k1": "🔒 Anónima: los admins ven el ánimo y los comentarios de cada día, aunque respondas solo tú. Nunca ven tu nombre.",
   "options.anonymous_k2": "🔒 Anónima: los admins ven medias y comentarios de los días en que responden al menos 2 personas. Nunca ven tu nombre.",
   "options.anonymous_today": "🔒 Anónima hoy. Desde el {date}, los admins verán quién responde qué. Lo respondido antes sigue siendo anónimo.",
   "options.named": "👁 Con nombre: los admins ven quién ha respondido qué.",

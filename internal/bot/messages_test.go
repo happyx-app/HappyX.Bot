@@ -670,7 +670,7 @@ func TestLowThresholdStaysAnonymousForMembers(t *testing.T) {
 		}
 	}
 	g.AnonymityThreshold = 1
-	if got := privacyLine(es, g, "2026-11-16"); !strings.Contains(got, "también si respondes solo tú") {
+	if got := privacyLine(es, g, "2026-11-16"); !strings.Contains(got, "aunque respondas solo tú") {
 		t.Fatalf("options at 1: %q", got)
 	}
 	g.AnonymityThreshold = 2

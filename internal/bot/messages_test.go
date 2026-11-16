@@ -2,6 +2,7 @@ package bot
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -642,34 +643,39 @@ func TestMinPeopleOptions(t *testing.T) {
 	}
 }
 
-// Below 3 an answer can point to whoever gave it, and every place a member reads about privacy
-// says so; an older API that sends no threshold means the default.
-func TestLowThresholdIsSaid(t *testing.T) {
+// Members are told their answer is anonymous at any minimum, since their name is never shown; at 1
+// the options say that each day's mood and comments show. Only the admins' texts warn that a low
+// minimum can point to whoever answered. An older API that sends no threshold means the default.
+func TestLowThresholdStaysAnonymousForMembers(t *testing.T) {
 	es := i18n.Get("es")
-	g := api.Guild{Name: "Equipo", Anonymous: true}
+	g := api.Guild{Name: "Equipo", Anonymous: true, AdminDiscordID: "1"}
 	if g.Threshold() != 3 || surveyPrivacy(es, g, "2026-11-16") != "🔒 Respuesta anónima" {
 		t.Fatalf("default: %d %q", g.Threshold(), surveyPrivacy(es, g, "2026-11-16"))
 	}
+	for _, k := range []int{1, 2} {
+		g.AnonymityThreshold = k
+		if got := surveyPrivacy(es, g, "2026-11-16"); got != "🔒 Respuesta anónima" {
+			t.Fatalf("survey footer at %d: %q", k, got)
+		}
+		if got := privacyLine(es, g, "2026-11-16"); !strings.HasPrefix(got, "🔒 Anónima") || !strings.Contains(got, "nunca quién ha respondido qué") {
+			t.Fatalf("options at %d: %q", k, got)
+		}
+		intro := fmt.Sprint(introComponents(es, g, "todo el servidor", "alex", "/happyx pausar"))
+		if !strings.Contains(intro, "🔒 Es anónimo.") || strings.Contains(intro, "al menos") {
+			t.Fatalf("intro at %d should be anonymous and not name the minimum: %s", k, intro)
+		}
+		kk := k
+		if got := configSaved(es, g, api.GuildPatch{AnonymityThreshold: &kk}, 3); !strings.Contains(got, "Para el equipo sigue siendo anónimo") {
+			t.Fatalf("config at %d warns the admin: %q", k, got)
+		}
+	}
 	g.AnonymityThreshold = 1
-	if got := surveyPrivacy(es, g, "2026-11-16"); got != "👁 Respuesta sin tu nombre · Los admins la ven aunque respondas solo tú" {
-		t.Fatalf("survey footer at 1: %q", got)
-	}
 	if got := privacyLine(es, g, "2026-11-16"); !strings.Contains(got, "aunque respondas solo tú") {
-		t.Fatalf("status at 1: %q", got)
+		t.Fatalf("options at 1: %q", got)
 	}
-	// Lowered today: it counts from tomorrow, so today's survey still says anonymous.
-	g.ThresholdSince, g.ThresholdBefore = "2026-11-17", 3
-	if surveyPrivacy(es, g, "2026-11-16") != "🔒 Respuesta anónima" || !strings.HasPrefix(surveyPrivacy(es, g, "2026-11-17"), "👁") {
-		t.Fatalf("lowered today: %q / %q", surveyPrivacy(es, g, "2026-11-16"), surveyPrivacy(es, g, "2026-11-17"))
-	}
-	g.ThresholdSince, g.ThresholdBefore = "", 0
 	g.AnonymityThreshold = 2
-	if got := privacyLine(es, g, "2026-11-16"); !strings.Contains(got, "al menos 2 personas") || !strings.Contains(got, "sabrá qué respondió la otra") {
-		t.Fatalf("status at 2: %q", got)
-	}
-	k := 2
-	if got := configSaved(es, g, api.GuildPatch{AnonymityThreshold: &k}, 3); !strings.Contains(got, "La encuesta se lo dice al equipo.") {
-		t.Fatalf("config at 2: %q", got)
+	if got := privacyLine(es, g, "2026-11-16"); !strings.Contains(got, "al menos 2 personas") {
+		t.Fatalf("options at 2: %q", got)
 	}
 }
 

@@ -145,9 +145,9 @@ const namedNoticeDays = 7
 func surveyPrivacy(l *i18n.Locale, g api.Guild, day string) string {
 	switch {
 	case g.NamedSoon(day):
-		return l.T(lowThreshold("survey.anonymous_until", g.ThresholdOn(day)), "date", shortDate(l, g.NamedSince))
+		return l.T("survey.anonymous_until", "date", shortDate(l, g.NamedSince))
 	case g.AnonymousOn(day):
-		return l.T(byThreshold("survey.anonymous", g.ThresholdOn(day)))
+		return l.T("survey.anonymous")
 	case g.NamedSince != "" && day < parseDay(g.NamedSince).AddDate(0, 0, namedNoticeDays).Format(isoDate):
 		return l.T("survey.named_since", "date", shortDate(l, g.NamedSince))
 	}

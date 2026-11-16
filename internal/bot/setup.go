@@ -751,7 +751,7 @@ func (b *Bot) introComponents(l *i18n.Locale, g api.Guild) []discordgo.MessageCo
 // introComponents is the introduction with the names already resolved: who gets the survey, the
 // main admin and the /happyx pause command.
 func introComponents(l *i18n.Locale, g api.Guild, who, admin, pause string) []discordgo.MessageComponent {
-	privacy := byThreshold("intro.anonymous", g.Threshold())
+	privacy := "intro.anonymous"
 	if !g.Anonymous {
 		privacy = "intro.named"
 	}
@@ -759,7 +759,7 @@ func introComponents(l *i18n.Locale, g api.Guild, who, admin, pause string) []di
 		"### " + l.T("intro.title"),
 		l.T("intro.survey", "days", daysLabel(l, g.WorkingDays), "hour", fmt.Sprintf("%02d", g.SurveyHour),
 			"timezone", g.Timezone, "who", who, "question", l.T("survey.question")),
-		l.T(privacy, "admin", admin, "k", g.Threshold()),
+		l.T(privacy, "admin", admin),
 	}
 	if g.GamesEnabled {
 		lines = append(lines, l.T("intro.game"))

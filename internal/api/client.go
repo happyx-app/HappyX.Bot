@@ -68,14 +68,14 @@ type Guild struct {
 	NamedSince string `json:"named_since"`
 	// AnonymityThreshold is the fewest people whose anonymous answers a report shows beyond
 	// counts. 0 from an older API.
-	AnonymityThreshold int    `json:"anonymity_threshold"`
+	AnonymityThreshold int `json:"anonymity_threshold"`
 	// A lowered threshold counts from ThresholdSince (YYYY-MM-DD, the day after it was lowered);
 	// answers for earlier days keep ThresholdBefore. Both empty otherwise.
 	ThresholdSince  string `json:"anonymity_threshold_since,omitempty"`
 	ThresholdBefore int    `json:"anonymity_threshold_before,omitempty"`
-	Timezone           string `json:"timezone"`
-	SurveyHour         int    `json:"survey_hour"`
-	ReportFrequency    string `json:"report_frequency"`
+	Timezone        string `json:"timezone"`
+	SurveyHour      int    `json:"survey_hour"`
+	ReportFrequency string `json:"report_frequency"`
 	// ReportDM is false when the main admin chose to see reports only on the web. Missing (an
 	// older API) means true.
 	ReportDM *bool `json:"report_dm"`

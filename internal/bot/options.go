@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -66,13 +67,32 @@ func capitalized(s string) string {
 	return string(unicode.ToUpper(r)) + s[n:]
 }
 
+// byThreshold is key, or its variant for an anonymity threshold below the safe one (key_k1,
+// key_k2): those say plainly that an answer can point to whoever gave it.
+func byThreshold(key string, k int) string {
+	if k < api.SafeAnonymityThreshold {
+		return key + "_k" + strconv.Itoa(k)
+	}
+	return key
+}
+
+// lowThreshold is key, or key_low below the safe anonymity threshold, for texts that only need
+// to stop saying «anonymous».
+func lowThreshold(key string, k int) string {
+	if k < api.SafeAnonymityThreshold {
+		return key + "_low"
+	}
+	return key
+}
+
 // privacyLine says what the admins see of the member's answers on day.
 func privacyLine(l *i18n.Locale, g api.Guild, day string) string {
 	switch {
 	case g.NamedSoon(day):
-		return l.T("options.anonymous_today", "date", shortDate(l, g.NamedSince))
+		return l.T(lowThreshold("options.anonymous_today", g.ThresholdOn(day)), "date", shortDate(l, g.NamedSince))
 	case g.AnonymousOn(day):
-		return l.T("options.anonymous", "k", g.Threshold())
+		k := g.ThresholdOn(day)
+		return l.T(byThreshold("options.anonymous", k), "k", k)
 	}
 	return l.T("options.named")
 }

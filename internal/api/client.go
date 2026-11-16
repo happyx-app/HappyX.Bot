@@ -68,10 +68,14 @@ type Guild struct {
 	NamedSince string `json:"named_since"`
 	// AnonymityThreshold is the fewest people whose anonymous answers a report shows beyond
 	// counts. 0 from an older API.
-	AnonymityThreshold int    `json:"anonymity_threshold"`
-	Timezone           string `json:"timezone"`
-	SurveyHour         int    `json:"survey_hour"`
-	ReportFrequency    string `json:"report_frequency"`
+	AnonymityThreshold int `json:"anonymity_threshold"`
+	// A lowered threshold counts from ThresholdSince (YYYY-MM-DD, the day after it was lowered);
+	// answers for earlier days keep ThresholdBefore. Both empty otherwise.
+	ThresholdSince  string `json:"anonymity_threshold_since,omitempty"`
+	ThresholdBefore int    `json:"anonymity_threshold_before,omitempty"`
+	Timezone        string `json:"timezone"`
+	SurveyHour      int    `json:"survey_hour"`
+	ReportFrequency string `json:"report_frequency"`
 	// ReportDM is false when the main admin chose to see reports only on the web. Missing (an
 	// older API) means true.
 	ReportDM *bool `json:"report_dm"`
@@ -113,11 +117,31 @@ type RoleFilter struct {
 // Everyone reports whether the filter lets every member in, as an older API's empty one does.
 func (f RoleFilter) Everyone() bool { return f.Mode != RolesOnly && f.Mode != RolesExcept }
 
-// MinAnonymityThreshold is the API's default and lowest anonymity threshold.
-const MinAnonymityThreshold = 3
+// The API's anonymity thresholds: the lowest an admin may set, and the default. Below
+// SafeAnonymityThreshold an answer can point to whoever gave it, and members are told so.
+const (
+	MinAnonymityThreshold     = 1
+	SafeAnonymityThreshold    = 3
+	DefaultAnonymityThreshold = SafeAnonymityThreshold
+)
 
-// Threshold is the anonymity threshold, MinAnonymityThreshold from an older API.
-func (g Guild) Threshold() int { return max(g.AnonymityThreshold, MinAnonymityThreshold) }
+// Threshold is the anonymity threshold, DefaultAnonymityThreshold from an older API that doesn't
+// send one.
+func (g Guild) Threshold() int {
+	if g.AnonymityThreshold < MinAnonymityThreshold {
+		return DefaultAnonymityThreshold
+	}
+	return g.AnonymityThreshold
+}
+
+// ThresholdOn is the anonymity threshold an answer for day (YYYY-MM-DD) is given under: the
+// current one, or the one before a lowering that only counts from ThresholdSince.
+func (g Guild) ThresholdOn(day string) int {
+	if g.ThresholdSince != "" && day < g.ThresholdSince {
+		return max(g.Threshold(), g.ThresholdBefore)
+	}
+	return g.Threshold()
+}
 
 // AnonymousOn reports whether an answer for day (YYYY-MM-DD) is anonymous: always while the
 // server is, and for the days before NamedSince once anonymity was turned off.

@@ -623,7 +623,7 @@ func configSaved(l *i18n.Locale, g api.Guild, p api.GuildPatch, before int) stri
 		s += "\n" + l.T("config.now_public", "date", shortDate(l, g.NamedSince))
 	}
 	if p.AnonymityThreshold != nil {
-		s += "\n" + l.T("config.min_people", "k", g.Threshold())
+		s += "\n" + l.T(byThreshold("config.min_people", g.Threshold()), "k", g.Threshold())
 		if g.Threshold() < before {
 			s += " " + l.T("config.min_people_lower")
 		}

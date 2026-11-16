@@ -69,6 +69,7 @@ func main() {
 		}
 		fmt.Fprintf(&b, `<div class="msg"><img class="avatar" alt="" src="data:image/svg+xml;base64,%s"><div class="body">`, base64.StdEncoding.EncodeToString(logo))
 		b.WriteString(`<div class="author">HappyX <span class="tag">APP</span> <span class="time">Today at 13:00</span></div>`)
+		openSelect = p.OpenSelect
 		writeMessage(&b, p.Msg)
 		if p.Ephemeral {
 			b.WriteString(`<div class="ephemeral">👁 Only you can see this · <u>Dismiss message</u></div>`)
@@ -81,6 +82,9 @@ func main() {
 	}
 	fmt.Println("wrote", *out)
 }
+
+// openSelect is the placeholder of the select the scene being written shows open.
+var openSelect string
 
 func writeMessage(b *strings.Builder, m *discordgo.MessageSend) {
 	if m.Content != "" {
@@ -162,6 +166,16 @@ func writeComponents(b *strings.Builder, components []discordgo.MessageComponent
 						text, class = html.EscapeString(rc.Placeholder), "select empty"
 					}
 					fmt.Fprintf(b, "<span class=\"%s\">%s<i>⌄</i></span>", class, text)
+					if openSelect != "" && rc.Placeholder == openSelect {
+						b.WriteString(`</div><div class="menu">`)
+						for _, o := range rc.Options {
+							fmt.Fprintf(b, "<div class=\"opt%s\">%s", map[bool]string{true: " on"}[o.Default], html.EscapeString(o.Label))
+							if o.Description != "" {
+								fmt.Fprintf(b, "<small>%s</small>", html.EscapeString(o.Description))
+							}
+							b.WriteString("</div>")
+						}
+					}
 				}
 			}
 			b.WriteString("</div>")
@@ -293,7 +307,7 @@ code{background:#2b2d31;border-radius:4px;padding:0 3px;font-size:14px}
 .row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.btn{border-radius:3px;padding:2px 16px;height:32px;display:inline-flex;align-items:center;font-size:14px;font-weight:500;color:#fff;background:#4e5058}.btn.primary{background:#5865f2}.btn.success{background:#248046}.btn.danger{background:#da373c}
 .container{background:#2b2d31;border-left:4px solid;border-radius:8px;padding:12px 16px 16px;margin-top:4px;max-width:520px;font-size:15px}.container>.content{margin-top:8px}
 .container hr{border:0;border-top:1px solid #3f4147;margin:12px 0 4px}
-.select{flex:1;display:flex;justify-content:space-between;align-items:center;background:#1e1f22;border:1px solid #1e1f22;border-radius:4px;padding:8px 12px;font-size:14px;color:#dbdee1}.select.empty{color:#949ba4}.select i{font-style:normal;color:#b5bac1}
+.select{flex:1;display:flex;justify-content:space-between;align-items:center;background:#1e1f22;border:1px solid #1e1f22;border-radius:4px;padding:8px 12px;font-size:14px;color:#dbdee1}.select.empty{color:#949ba4}.menu{display:grid;background:#2b2d31;border:1px solid #1e1f22;border-radius:4px;margin-top:-4px;margin-bottom:8px}.menu .opt{padding:8px 12px;font-size:14px;color:#dbdee1}.menu .opt.on{background:#404249}.menu small{display:block;color:#949ba4;font-size:12px}.select i{font-style:normal;color:#b5bac1}
 .ephemeral{font-size:12px;color:#949ba4;margin-top:4px}.ephemeral u{color:#00a8fc;text-decoration:none}
 </style></head><body>
 `

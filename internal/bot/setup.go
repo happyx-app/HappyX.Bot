@@ -751,7 +751,7 @@ func (b *Bot) introComponents(l *i18n.Locale, g api.Guild) []discordgo.MessageCo
 // introComponents is the introduction with the names already resolved: who gets the survey, the
 // main admin and the /happyx pause command.
 func introComponents(l *i18n.Locale, g api.Guild, who, admin, pause string) []discordgo.MessageComponent {
-	privacy := "intro.anonymous"
+	privacy := byThreshold("intro.anonymous", g.Threshold())
 	if !g.Anonymous {
 		privacy = "intro.named"
 	}
@@ -899,8 +899,8 @@ func (b *Bot) handleTestButton(ctx context.Context, i *discordgo.InteractionCrea
 }
 
 // minPeopleThresholds are the anonymity thresholds the assistant offers; /happyx config and the
-// web take any from 3 to 50.
-var minPeopleThresholds = []int{3, 4, 5, 6, 8, 10}
+// web take any from 1 to 50.
+var minPeopleThresholds = []int{1, 2, 3, 4, 5, 6, 8, 10}
 
 // minPeopleOptions offers the anonymity thresholds, current selected, adding it if it is another.
 func minPeopleOptions(l *i18n.Locale, current int) []discordgo.SelectMenuOption {
@@ -911,8 +911,15 @@ func minPeopleOptions(l *i18n.Locale, current int) []discordgo.SelectMenuOption 
 	}
 	var out []discordgo.SelectMenuOption
 	for _, k := range ks {
-		o := discordgo.SelectMenuOption{Label: l.T("setup.min_people_n", "k", k), Value: strconv.Itoa(k), Default: k == current}
-		if k == api.MinAnonymityThreshold {
+		label := "setup.min_people_n"
+		if k == 1 {
+			label = "setup.min_people_n_k1"
+		}
+		o := discordgo.SelectMenuOption{Label: l.T(label, "k", k), Value: strconv.Itoa(k), Default: k == current}
+		switch {
+		case k < api.SafeAnonymityThreshold:
+			o.Description = l.T("setup.min_people_risky")
+		case k == api.SafeAnonymityThreshold:
 			o.Description = l.T("setup.min_people_small")
 		}
 		out = append(out, o)

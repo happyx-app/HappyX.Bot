@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -66,13 +67,22 @@ func capitalized(s string) string {
 	return string(unicode.ToUpper(r)) + s[n:]
 }
 
+// byThreshold is key, or its variant for an anonymity threshold below the safe one (key_k1,
+// key_k2): those say plainly that an answer can point to whoever gave it.
+func byThreshold(key string, k int) string {
+	if k < api.SafeAnonymityThreshold {
+		return key + "_k" + strconv.Itoa(k)
+	}
+	return key
+}
+
 // privacyLine says what the admins see of the member's answers on day.
 func privacyLine(l *i18n.Locale, g api.Guild, day string) string {
 	switch {
 	case g.NamedSoon(day):
 		return l.T("options.anonymous_today", "date", shortDate(l, g.NamedSince))
 	case g.AnonymousOn(day):
-		return l.T("options.anonymous", "k", g.Threshold())
+		return l.T(byThreshold("options.anonymous", g.Threshold()), "k", g.Threshold())
 	}
 	return l.T("options.named")
 }

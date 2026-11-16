@@ -53,6 +53,10 @@ func Previews(code string) []Preview {
 	fivePeople.AnonymityThreshold = 5
 	three, threePeople := 3, g
 	threePeople.AnonymityThreshold = 3
+	one, onePerson := 1, g
+	onePerson.AnonymityThreshold = 1
+	two, twoPeople := 2, g
+	twoPeople.AnonymityThreshold = 2
 	// The Monday after: names started on Saturday 24, as the survey above announced.
 	namedDay := "2026-10-26"
 	sunToThu := g
@@ -105,6 +109,9 @@ func Previews(code string) []Preview {
 		{Title: "Daily survey", Channel: "DM", Msg: surveyMessage(l, g, day, ana, PreviewGuildIcon)},
 		{Title: "Daily survey the day anonymity is turned off (names from tomorrow)", Channel: "DM", Msg: surveyMessage(l, public, day, ana, PreviewGuildIcon)},
 		{Title: "Daily survey the first week with names", Channel: "DM", Msg: surveyMessage(l, public, namedDay, ana, PreviewGuildIcon)},
+		{Title: "Daily survey when results show even if only 1 person answers", Channel: "DM", Msg: surveyMessage(l, onePerson, day, ana, PreviewGuildIcon)},
+		{Title: "Daily survey when results show from 2 people", Channel: "DM", Msg: surveyMessage(l, twoPeople, day, ana, PreviewGuildIcon)},
+		{Title: "Options (from the survey) with results from 1 person", Channel: "DM", Ephemeral: true, Msg: data(b.optionsMessage(l, onePerson, day, "1"))},
 		{Title: "Daily survey with the admin's own message", Channel: "DM", Msg: surveyMessage(l, custom, day, ana, PreviewGuildIcon)},
 		{Title: "Daily survey until the first answer since the privacy policy's date", Channel: "DM", Msg: surveyMessage(l, g, day, anaFirst, PreviewGuildIcon)},
 		{Title: "Options (from the survey)", Channel: "DM", Ephemeral: true, Msg: data(b.optionsMessage(l, g, day, "1"))},
@@ -191,6 +198,10 @@ func Previews(code string) []Preview {
 			Msg: text(configSaved(l, fivePeople, api.GuildPatch{AnonymityThreshold: &five}, 3))},
 		{Title: "Lowering the fewest people", Channel: "#general", Command: "/happyx config min_people:3", Ephemeral: true,
 			Msg: text(configSaved(l, threePeople, api.GuildPatch{AnonymityThreshold: &three}, 5))},
+		{Title: "Lowering the fewest people to 1", Channel: "#general", Command: "/happyx config min_people:1", Ephemeral: true,
+			Msg: text(configSaved(l, onePerson, api.GuildPatch{AnonymityThreshold: &one}, 3))},
+		{Title: "Lowering the fewest people to 2", Channel: "#general", Command: "/happyx config min_people:2", Ephemeral: true,
+			Msg: text(configSaved(l, twoPeople, api.GuildPatch{AnonymityThreshold: &two}, 3))},
 		{Title: "Turning the game on", Channel: "#general", Command: "/happyx config games:True", Ephemeral: true,
 			Msg: text(configSaved(l, games, api.GuildPatch{GamesEnabled: &yes}, 0))},
 		{Title: "«Who's who?» question (Monday)", Channel: "DM", Msg: gameQuestionMessage(l, g, api.GameRound{Week: week, Question: question}, gameLink)},
@@ -245,6 +256,8 @@ func setupPreviews(l *i18n.Locale, g api.Guild) []Preview {
 
 	named := page2.Guild
 	named.Anonymous = false
+	onePersonIntro := page2.Guild
+	onePersonIntro.AnonymityThreshold = 1
 	who := joinAnd(l, []string{"Desarrollo", "Diseño"})
 	pause := "`/happyx " + cmdPause + "`"
 	test := (&Bot{now: func() time.Time { return now }}).testSurveyFor(l, g, surveyRecipient{ID: PreviewAnaID, Name: "Ana"}, PreviewGuildIcon)
@@ -260,6 +273,7 @@ func setupPreviews(l *i18n.Locale, g api.Guild) []Preview {
 		{Title: "Setup: survey started", Channel: "DM", Msg: v2(setupComponents(l, started, "2"))},
 		{Title: "/happyx setup in a server", Channel: "#general", Command: "/happyx " + cmdSetup, Ephemeral: true, Msg: v2(setupComponents(l, d, "1"))},
 		{Title: "Introduction (anonymous, only some roles, game on)", Channel: "#general", Msg: v2(introComponents(l, page2.Guild, who, "alex", pause))},
+		{Title: "Introduction (results even if 1 person answers)", Channel: "#general", Msg: v2(introComponents(l, onePersonIntro, l.T("intro.who_all"), "alex", pause))},
 		{Title: "Introduction (with names, everyone)", Channel: "#general", Msg: v2(introComponents(l, named, l.T("intro.who_all"), "alex", pause))},
 		{Title: "Test survey (Try the survey)", Channel: "#general", Ephemeral: true, Msg: test},
 		{Title: "Test survey answered (nothing saved)", Channel: "#general", Ephemeral: true,

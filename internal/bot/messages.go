@@ -147,7 +147,7 @@ func surveyPrivacy(l *i18n.Locale, g api.Guild, day string) string {
 	case g.NamedSoon(day):
 		return l.T("survey.anonymous_until", "date", shortDate(l, g.NamedSince))
 	case g.AnonymousOn(day):
-		return l.T("survey.anonymous")
+		return l.T(byThreshold("survey.anonymous", g.Threshold()))
 	case g.NamedSince != "" && day < parseDay(g.NamedSince).AddDate(0, 0, namedNoticeDays).Format(isoDate):
 		return l.T("survey.named_since", "date", shortDate(l, g.NamedSince))
 	}

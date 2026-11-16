@@ -113,11 +113,22 @@ type RoleFilter struct {
 // Everyone reports whether the filter lets every member in, as an older API's empty one does.
 func (f RoleFilter) Everyone() bool { return f.Mode != RolesOnly && f.Mode != RolesExcept }
 
-// MinAnonymityThreshold is the API's default and lowest anonymity threshold.
-const MinAnonymityThreshold = 3
+// The API's anonymity thresholds: the lowest an admin may set, and the default. Below
+// SafeAnonymityThreshold an answer can point to whoever gave it, and members are told so.
+const (
+	MinAnonymityThreshold     = 1
+	SafeAnonymityThreshold    = 3
+	DefaultAnonymityThreshold = SafeAnonymityThreshold
+)
 
-// Threshold is the anonymity threshold, MinAnonymityThreshold from an older API.
-func (g Guild) Threshold() int { return max(g.AnonymityThreshold, MinAnonymityThreshold) }
+// Threshold is the anonymity threshold, DefaultAnonymityThreshold from an older API that doesn't
+// send one.
+func (g Guild) Threshold() int {
+	if g.AnonymityThreshold < MinAnonymityThreshold {
+		return DefaultAnonymityThreshold
+	}
+	return g.AnonymityThreshold
+}
 
 // AnonymousOn reports whether an answer for day (YYYY-MM-DD) is anonymous: always while the
 // server is, and for the days before NamedSince once anonymity was turned off.

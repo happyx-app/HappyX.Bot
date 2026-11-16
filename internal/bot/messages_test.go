@@ -2,6 +2,7 @@ package bot
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -620,18 +621,49 @@ func TestAnonymousCommentsHaveNoDayOrMood(t *testing.T) {
 func TestMinPeopleOptions(t *testing.T) {
 	es := i18n.Get("es")
 	opts := minPeopleOptions(es, 3)
-	if opts[0].Label != "Resultados con al menos 3 personas al día" || !opts[0].Default || opts[0].Description != "Para equipos pequeños" {
-		t.Fatalf("first option: %+v", opts[0])
+	if opts[0].Label != "Resultados aunque responda 1 persona" || opts[0].Description != "Se puede saber quién respondió qué" ||
+		opts[1].Label != "Resultados con al menos 2 personas al día" || opts[1].Description != "Se puede saber quién respondió qué" {
+		t.Fatalf("below 3, the risk is said: %+v", opts[:2])
 	}
-	if opts := minPeopleOptions(es, 7); len(opts) != 7 || opts[4].Value != "7" || !opts[4].Default {
+	if opts[2].Label != "Resultados con al menos 3 personas al día" || !opts[2].Default || opts[2].Description != "Para equipos pequeños" {
+		t.Fatalf("the default: %+v", opts[2])
+	}
+	if opts := minPeopleOptions(es, 7); len(opts) != 9 || opts[6].Value != "7" || !opts[6].Default {
 		t.Fatalf("a threshold set elsewhere is offered: %+v", opts)
 	}
-	p, _, save, ok := setupPatch(setupID{Action: setupMinPeople, Page: "1"}, []string{"5"})
-	if !ok || !save || p.AnonymityThreshold == nil || *p.AnonymityThreshold != 5 {
-		t.Fatalf("choosing 5: %+v %v %v", p, save, ok)
+	for _, v := range []string{"5", "1"} {
+		p, _, save, ok := setupPatch(setupID{Action: setupMinPeople, Page: "1"}, []string{v})
+		if !ok || !save || p.AnonymityThreshold == nil || strconv.Itoa(*p.AnonymityThreshold) != v {
+			t.Fatalf("choosing %s: %+v %v %v", v, p, save, ok)
+		}
 	}
-	if _, _, _, ok := setupPatch(setupID{Action: setupMinPeople, Page: "1"}, []string{"2"}); ok {
-		t.Fatal("2 is below the minimum")
+	if _, _, _, ok := setupPatch(setupID{Action: setupMinPeople, Page: "1"}, []string{"0"}); ok {
+		t.Fatal("0 is below the minimum")
+	}
+}
+
+// Below 3 an answer can point to whoever gave it, and every place a member reads about privacy
+// says so; an older API that sends no threshold means the default.
+func TestLowThresholdIsSaid(t *testing.T) {
+	es := i18n.Get("es")
+	g := api.Guild{Name: "Equipo", Anonymous: true}
+	if g.Threshold() != 3 || surveyPrivacy(es, g, "2026-11-16") != "🔒 Respuesta anónima" {
+		t.Fatalf("default: %d %q", g.Threshold(), surveyPrivacy(es, g, "2026-11-16"))
+	}
+	g.AnonymityThreshold = 1
+	if got := surveyPrivacy(es, g, "2026-11-16"); got != "🔒 Respuesta sin tu nombre · Los admins la ven aunque respondas solo tú" {
+		t.Fatalf("survey footer at 1: %q", got)
+	}
+	if got := privacyLine(es, g, "2026-11-16"); !strings.Contains(got, "aunque respondas solo tú") {
+		t.Fatalf("status at 1: %q", got)
+	}
+	g.AnonymityThreshold = 2
+	if got := privacyLine(es, g, "2026-11-16"); !strings.Contains(got, "al menos 2 personas") || !strings.Contains(got, "sabrá qué respondió la otra") {
+		t.Fatalf("status at 2: %q", got)
+	}
+	k := 2
+	if got := configSaved(es, g, api.GuildPatch{AnonymityThreshold: &k}, 3); !strings.Contains(got, "La encuesta se lo dice al equipo.") {
+		t.Fatalf("config at 2: %q", got)
 	}
 }
 

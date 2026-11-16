@@ -250,7 +250,7 @@
   "intro.who_except": "vous tous sauf {roles}",
   "intro.and": " et ",
   "intro.anonymous": "**🔒 C'est anonyme.** {admin} voit les moyennes et les commentaires des jours où au moins {k} personnes répondent, jamais qui a répondu quoi.",
-  "intro.anonymous_k1": "**👁 Sans noms.** {admin} voit l'humeur et les commentaires de chaque jour même quand une seule personne répond, donc peut savoir de qui ils viennent.",
+  "intro.anonymous_k1": "**👁 Sans noms.** {admin} voit l'humeur et les commentaires de chaque jour même quand une seule personne répond, et peut donc savoir de qui ils viennent.",
   "intro.anonymous_k2": "**👁 Sans noms.** {admin} voit les moyennes et les commentaires des jours où au moins 2 personnes répondent. Si l'une d'elles est admin, elle saura ce que l'autre personne a répondu.",
   "intro.named": "**👁 Avec nom.** {admin} voit qui a répondu quoi.",
   "intro.game": "🎲 Chaque semaine, il y a aussi le jeu « Qui est qui ? ».",

@@ -438,8 +438,8 @@ func comments(l *i18n.Locale, msgs []api.ReportMsg) string {
 		}
 		if m.Day != "" {
 			meta := dayLabel(l, m.Day)
-			if m.Username != "" {
-				meta += " · " + m.Username
+			if name := m.Name(); name != "" {
+				meta += " · " + name
 			}
 			entry = fmt.Sprintf("> %s %s\n-# %s\n", moodEmoji(m.Mood),
 				strings.ReplaceAll(truncate(m.Message, commentMax), "\n", "\n> "), meta)
@@ -464,7 +464,7 @@ func kudosSection(l *i18n.Locale, k api.KudosSummary) string {
 	b.WriteString(l.T("report.kudos_summary", "count", k.Count, "people", k.Receivers) + "\n")
 	for _, h := range k.Highlights {
 		fmt.Fprintf(&b, "%s\n-# %s → %s · %s\n", quote(truncate(h.Message, kudosMax)),
-			h.FromUsername, h.ToUsername, dayLabel(l, h.Day))
+			h.FromName(), h.ToName(), dayLabel(l, h.Day))
 	}
 	if more := k.Count - len(k.Highlights); more > 0 {
 		b.WriteString("-# " + l.T("report.more_kudos", "n", more) + "\n")

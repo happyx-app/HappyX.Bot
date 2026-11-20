@@ -24,7 +24,7 @@ func TestClientAgainstAPI(t *testing.T) {
 	if _, err := c.RegisterGuild(ctx, g, "Contract test", admin); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.UpsertMember(ctx, g, u, "tester", nil); err != nil {
+	if err := c.UpsertMember(ctx, g, u, "tester", "Tester", nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := c.RecordMood(ctx, g, u, today, 4, "hola"); err != nil {
@@ -58,14 +58,14 @@ func TestClientAgainstAPI(t *testing.T) {
 	}
 
 	const u2 = "200000000000000079"
-	if err := c.UpsertMember(ctx, g, u2, "tester2", nil); err != nil {
+	if err := c.UpsertMember(ctx, g, u2, "tester2", "", nil); err != nil {
 		t.Fatal(err)
 	}
 	k, err := c.GiveKudos(ctx, g, u, u2, "gracias")
 	if err != nil && !errors.Is(err, ErrTooMany) { // reruns on the same day hit the limit
 		t.Fatal(err)
 	}
-	if err == nil && (k.FromUsername != "tester" || k.ToUsername != "tester2") {
+	if err == nil && (k.FromUsername != "tester" || k.ToUsername != "tester2" || k.FromName() != "Tester" || k.ToName() != "tester2") {
 		t.Fatalf("kudos should come back with usernames: %+v", k)
 	}
 	var apiErr *Error
@@ -79,7 +79,7 @@ func TestClientAgainstAPI(t *testing.T) {
 	if err := c.RemoveMember(ctx, g, u); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.UpsertMember(ctx, g, u, "tester", nil); err != nil {
+	if err := c.UpsertMember(ctx, g, u, "tester", "Tester", nil); err != nil {
 		t.Fatal(err)
 	}
 	ms, err := c.Members(ctx, g)
@@ -95,7 +95,7 @@ func TestClientAgainstAPI(t *testing.T) {
 	if err := c.SyncRoles(ctx, g, []Role{{ID: "400000000000000077", Name: "Staff", Color: 0x3498db, Position: 1}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := c.SyncMembers(ctx, g, []MemberSync{{ID: u, Username: "tester"}, {ID: u2, Username: "tester2", RoleIDs: []string{"400000000000000077"}}}); err != nil {
+	if err := c.SyncMembers(ctx, g, []MemberSync{{ID: u, Username: "tester", DisplayName: "Tester"}, {ID: u2, Username: "tester2", RoleIDs: []string{"400000000000000077"}}}); err != nil {
 		t.Fatal(err)
 	}
 	if ms, err := c.Members(ctx, g); err != nil {
@@ -107,7 +107,7 @@ func TestClientAgainstAPI(t *testing.T) {
 			}
 		}
 	}
-	if err := c.SyncMember(ctx, g, u2, "tester2", []string{"400000000000000077"}); err != nil {
+	if err := c.SyncMember(ctx, g, u2, "tester2", "", []string{"400000000000000077"}); err != nil {
 		t.Fatal(err)
 	}
 	for user, want := range map[string]string{admin: AccessOwner, u2: AccessNone} {
@@ -125,7 +125,7 @@ func TestClientAgainstAPI(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := c.UpsertMember(ctx, g, admin, "admin", nil); err != nil {
+	if err := c.UpsertMember(ctx, g, admin, "admin", "Admin", nil); err != nil {
 		t.Fatal(err)
 	}
 	setSurveyRoles(map[string]any{"mode": "only", "role_ids": []string{"400000000000000077"}})

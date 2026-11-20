@@ -147,10 +147,16 @@ func (b *Bot) giveKudos(ctx context.Context, i *discordgo.InteractionCreate, l *
 		b.replyError(i, l, err)
 		return
 	}
+	from := personOf(giver, i.Member)
+	toMember, _ := b.dg.State.Member(i.GuildID, to.ID) // for their server nickname, if cached
+	receiver := personOf(to, toMember)
 	// Either may be missing if they joined while the bot was offline. nil keeps their survey
 	// opt-in as it is.
-	for _, u := range []*discordgo.User{giver, to} {
-		if err := b.api.UpsertMember(ctx, i.GuildID, u.ID, u.Username, nil); err != nil {
+	for _, p := range []struct {
+		u    *discordgo.User
+		name string
+	}{{giver, from.Name}, {to, receiver.Name}} {
+		if err := b.api.UpsertMember(ctx, i.GuildID, p.u.ID, p.u.Username, p.name, nil); err != nil {
 			b.replyError(i, l, err)
 			return
 		}
@@ -165,9 +171,7 @@ func (b *Bot) giveKudos(ctx context.Context, i *discordgo.InteractionCreate, l *
 	}
 
 	gl := i18n.Get(g.Language)
-	from := personOf(giver, i.Member)
-	toMember, _ := b.dg.State.Member(i.GuildID, to.ID) // for their server nickname, if cached
-	card := kudosCard(gl, from, personOf(to, toMember), message, origin)
+	card := kudosCard(gl, from, receiver, message, origin)
 	posted := b.postKudos(i, l, g, card, to.ID)
 	if posted == nil {
 		return

@@ -18,7 +18,7 @@ import (
 // It returns the vacations it ended. An API from before vacations answers 404.
 func (b *Bot) resume(ctx context.Context, g api.Guild, user *discordgo.User) ([]api.Vacation, error) {
 	yes := true
-	if err := b.api.UpsertMember(ctx, g.DiscordID, user.ID, user.Username, &yes); err != nil {
+	if err := b.api.UpsertMember(ctx, g.DiscordID, user.ID, user.Username, b.userName(g.DiscordID, user), &yes); err != nil {
 		return nil, err
 	}
 	ended, err := b.api.EndVacations(ctx, g.DiscordID, user.ID)

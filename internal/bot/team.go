@@ -444,7 +444,7 @@ func (b *Bot) toldButton(ctx context.Context, l *i18n.Locale, guildID, day strin
 	if !b.noteAlive(ctx, guildID, n) {
 		return nil
 	}
-	name := b.displayName(guildID, api.Member{DiscordID: n.AuthorDiscordID, Username: n.AuthorUsername})
+	name := b.displayName(guildID, api.Member{DiscordID: n.AuthorDiscordID, Username: n.AuthorUsername, DisplayName: n.AuthorDisplayName})
 	return &discordgo.Button{
 		Label: truncate(l.T("answer.told_button", "name", name), 80),
 		Style: discordgo.LinkButton, URL: messageLink(guildID, n.ChannelID, n.MessageID),

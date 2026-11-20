@@ -169,7 +169,10 @@ func (g Guild) SendsSurvey() bool { return g.SurveyEnabled == nil || *g.SurveyEn
 type Member struct {
 	DiscordID string `json:"discord_user_id"`
 	Username  string `json:"username"`
-	Active    bool   `json:"active"`
+	// DisplayName is the name the server shows for them, with their username in brackets when
+	// another member of the server goes by the same name; empty from older APIs.
+	DisplayName string `json:"display_name"`
+	Active      bool   `json:"active"`
 	// Streak is how many days in a row they answered; only filled by SurveyRecipients withStreak.
 	Streak int `json:"streak"`
 	// PolicyPending is true while they haven't answered in the guild since the privacy policy's
@@ -238,9 +241,28 @@ type Kudos struct {
 	Day          string `json:"day"`
 	FromID       string `json:"from_discord_user_id"`
 	FromUsername string `json:"from_username"`
-	ToID         string `json:"to_discord_user_id"`
-	ToUsername   string `json:"to_username"`
-	Message      string `json:"message"`
+	// FromDisplayName and ToDisplayName are the names the server shows; empty from older APIs.
+	FromDisplayName string `json:"from_display_name"`
+	ToID            string `json:"to_discord_user_id"`
+	ToUsername      string `json:"to_username"`
+	ToDisplayName   string `json:"to_display_name"`
+	Message         string `json:"message"`
+}
+
+// FromName and ToName are how HappyX names the giver and the receiver (see Member.DisplayName).
+func (k Kudos) FromName() string { return orUsername(k.FromDisplayName, k.FromUsername) }
+func (k Kudos) ToName() string   { return orUsername(k.ToDisplayName, k.ToUsername) }
+
+// Name is how HappyX names the comment's author; empty for an anonymous comment.
+func (m ReportMsg) Name() string { return orUsername(m.DisplayName, m.Username) }
+
+// orUsername is the display name the API gave, or the username from an API older than display
+// names.
+func orUsername(displayName, username string) string {
+	if displayName != "" {
+		return displayName
+	}
+	return username
 }
 
 type ReportDay struct {
@@ -260,11 +282,12 @@ func (d ReportDay) Plotted() bool { return d.Responses > 0 && !d.Withheld }
 
 // ReportMsg is a comment. An anonymous one has only its text: Day is empty and Mood 0.
 type ReportMsg struct {
-	Day       string `json:"day"`
-	Mood      int    `json:"mood"`
-	Message   string `json:"message"`
-	DiscordID string `json:"discord_user_id,omitempty"`
-	Username  string `json:"username,omitempty"`
+	Day         string `json:"day"`
+	Mood        int    `json:"mood"`
+	Message     string `json:"message"`
+	DiscordID   string `json:"discord_user_id,omitempty"`
+	Username    string `json:"username,omitempty"`
+	DisplayName string `json:"display_name,omitempty"`
 }
 
 func (c *Client) RegisterGuild(ctx context.Context, id, name, adminID string) (Guild, error) {
@@ -309,33 +332,36 @@ func (c *Client) DoneRemoving(ctx context.Context, id string) error {
 	return c.do(ctx, http.MethodDelete, "/v1/removals/"+url.PathEscape(id), nil, nil)
 }
 
-// UpsertMember registers or renames a member. active nil keeps an existing member's
-// opt-in state; true opts them in.
-func (c *Client) UpsertMember(ctx context.Context, guildID, userID, username string, active *bool) error {
-	body := map[string]any{"username": username}
+// UpsertMember registers or renames a member. displayName is the name the server shows for
+// them (nickname, else Discord display name, else username). active nil keeps an existing
+// member's opt-in state; true opts them in.
+func (c *Client) UpsertMember(ctx context.Context, guildID, userID, username, displayName string, active *bool) error {
+	body := map[string]any{"username": username, "display_name": displayName}
 	if active != nil {
 		body["active"] = *active
 	}
 	return c.do(ctx, http.MethodPut, memberPath(guildID, userID), body, nil)
 }
 
-// SyncMember registers the member or refreshes their username and Discord roles, keeping their
+// SyncMember registers the member or refreshes their names and Discord roles, keeping their
 // opt-in state.
-func (c *Client) SyncMember(ctx context.Context, guildID, userID, username string, roleIDs []string) error {
+func (c *Client) SyncMember(ctx context.Context, guildID, userID, username, displayName string, roleIDs []string) error {
 	if roleIDs == nil {
 		roleIDs = []string{}
 	}
-	return c.do(ctx, http.MethodPut, memberPath(guildID, userID), map[string]any{"username": username, "role_ids": roleIDs}, nil)
+	return c.do(ctx, http.MethodPut, memberPath(guildID, userID), map[string]any{"username": username, "display_name": displayName, "role_ids": roleIDs}, nil)
 }
 
 // MemberSync is one member in a bulk SyncMembers call.
 type MemberSync struct {
-	ID       string   `json:"discord_user_id"`
-	Username string   `json:"username"`
-	RoleIDs  []string `json:"role_ids"`
+	ID       string `json:"discord_user_id"`
+	Username string `json:"username"`
+	// DisplayName is the name the server shows for them.
+	DisplayName string   `json:"display_name"`
+	RoleIDs     []string `json:"role_ids"`
 }
 
-// SyncMembers registers up to 1000 members or refreshes their usernames and roles in one
+// SyncMembers registers up to 1000 members or refreshes their names and roles in one
 // request, keeping everyone's opt-in state.
 func (c *Client) SyncMembers(ctx context.Context, guildID string, ms []MemberSync) error {
 	for i := range ms {
@@ -607,12 +633,14 @@ type TeamNote struct {
 	ID              int64  `json:"id"`
 	AuthorDiscordID string `json:"author_discord_user_id"`
 	AuthorUsername  string `json:"author_username"`
-	From            string `json:"from"`
-	To              string `json:"to"`
-	Body            string `json:"body"`
-	ChannelID       string `json:"channel_id"`
-	MessageID       string `json:"message_id"`
-	PostedOn        string `json:"posted_on"`
+	// AuthorDisplayName is the name the server shows for the author; empty from older APIs.
+	AuthorDisplayName string `json:"author_display_name"`
+	From              string `json:"from"`
+	To                string `json:"to"`
+	Body              string `json:"body"`
+	ChannelID         string `json:"channel_id"`
+	MessageID         string `json:"message_id"`
+	PostedOn          string `json:"posted_on"`
 }
 
 // TeamNoteMaxLength is the API's limit on a note's text.

@@ -55,10 +55,13 @@ func TestReportMessageFitsDiscordLimits(t *testing.T) {
 func TestReportMessageKudos(t *testing.T) {
 	r := api.Report{From: "2026-10-19", To: "2026-10-25", Anonymous: true,
 		Kudos: api.KudosSummary{Count: 7, Givers: 3, Receivers: 2, Highlights: []api.Kudos{
-			{Day: "2026-10-23", FromUsername: "ana", ToUsername: "bea", Message: "gracias por el cable\ncon el despliegue"},
+			// bea's name comes from an API older than display names: the username stands in.
+			{Day: "2026-10-23", FromID: "1", FromUsername: "ana.garcia_corp", FromDisplayName: "Ana", ToID: "2", ToUsername: "bea", Message: "gracias por el cable\ncon el despliegue"},
+			// Two Davids: the API tells them apart by username.
+			{Day: "2026-10-22", FromID: "3", FromUsername: "david.garcia", FromDisplayName: "David (david.garcia)", ToID: "4", ToUsername: "david.moreno", ToDisplayName: "David (david.moreno)", Message: "gracias"},
 		}}}
 	d := reportMessage(i18n.Get("es"), api.Guild{Name: "Test"}, r).Embeds[0].Description
-	for _, want := range []string{"### 🙌 Kudos", "**7** kudos · **2** personas", "> gracias por el cable\n> con el despliegue", "-# ana → bea · vi 23 oct", "y 6 kudos más"} {
+	for _, want := range []string{"### 🙌 Kudos", "**7** kudos · **2** personas", "> gracias por el cable\n> con el despliegue", "-# Ana → bea · vi 23 oct", "-# David (david.garcia) → David (david.moreno) · ju 22 oct", "y 5 kudos más"} {
 		if !strings.Contains(strings.ToLower(d), strings.ToLower(want)) {
 			t.Errorf("missing %q in:\n%s", want, d)
 		}
@@ -609,12 +612,12 @@ func TestAnonymousCommentsHaveNoDayOrMood(t *testing.T) {
 	es := i18n.Get("es")
 	got := comments(es, []api.ReportMsg{
 		{Message: "Muchas reuniones"},
-		{Day: "2026-11-10", Mood: 4, Message: "Bien", Username: "ana", DiscordID: "1"},
+		{Day: "2026-11-10", Mood: 4, Message: "Bien", Username: "ana.garcia_corp", DisplayName: "Ana", DiscordID: "1"},
 	})
 	if !strings.Contains(got, "> Muchas reuniones\n") || strings.Contains(got, "> 🙂 Muchas") {
 		t.Fatalf("anonymous comment: %q", got)
 	}
-	if !strings.Contains(got, "\n> 🙂 Bien\n-# ma 10 nov · ana") {
+	if !strings.Contains(got, "\n> 🙂 Bien\n-# ma 10 nov · Ana") {
 		t.Fatalf("named comment: %q", got)
 	}
 }

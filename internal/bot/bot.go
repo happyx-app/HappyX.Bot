@@ -217,7 +217,7 @@ func (b *Bot) syncMembers(ctx context.Context, guildID string) (int, error) {
 			if m.User == nil || m.User.Bot {
 				continue
 			}
-			batch = append(batch, api.MemberSync{ID: m.User.ID, Username: m.User.Username, RoleIDs: m.Roles})
+			batch = append(batch, api.MemberSync{ID: m.User.ID, Username: m.User.Username, DisplayName: m.DisplayName(), RoleIDs: m.Roles})
 			// Keep them in the session state so the survey can greet them by their server name,
 			// even if the API sync below fails.
 			m.GuildID = guildID
@@ -246,7 +246,7 @@ func (b *Bot) sendMembers(ctx context.Context, guildID string, ms []api.MemberSy
 		return err
 	}
 	for _, m := range ms {
-		if err := b.api.SyncMember(ctx, guildID, m.ID, m.Username, m.RoleIDs); err != nil {
+		if err := b.api.SyncMember(ctx, guildID, m.ID, m.Username, m.DisplayName, m.RoleIDs); err != nil {
 			return err
 		}
 	}
@@ -297,18 +297,18 @@ func (b *Bot) onMemberAdd(s *discordgo.Session, e *discordgo.GuildMemberAdd) {
 	}
 	ctx := context.Background()
 	yes := true
-	if err := b.api.UpsertMember(ctx, e.GuildID, e.User.ID, e.User.Username, &yes); err != nil {
+	if err := b.api.UpsertMember(ctx, e.GuildID, e.User.ID, e.User.Username, e.DisplayName(), &yes); err != nil {
 		b.log.Error("member join", "guild", e.GuildID, "err", err)
 		return
 	}
 	// Someone coming back starts without the roles they had before.
-	if err := b.api.SyncMember(ctx, e.GuildID, e.User.ID, e.User.Username, e.Roles); err != nil {
+	if err := b.api.SyncMember(ctx, e.GuildID, e.User.ID, e.User.Username, e.DisplayName(), e.Roles); err != nil {
 		b.log.Error("member roles", "guild", e.GuildID, "err", err)
 	}
 }
 
-// onMemberUpdate keeps a member's roles and username current, so access given to a role on the
-// dashboard follows who has it.
+// onMemberUpdate keeps a member's roles and names current, so access given to a role on the
+// dashboard follows who has it and the dashboard shows the name the server shows.
 func (b *Bot) onMemberUpdate(s *discordgo.Session, e *discordgo.GuildMemberUpdate) {
 	if e.Member != nil && e.User != nil && s.State.User != nil && e.User.ID == s.State.User.ID {
 		b.syncChannels(context.Background(), e.GuildID) // the bot's own roles changed where it may post
@@ -317,7 +317,7 @@ func (b *Bot) onMemberUpdate(s *discordgo.Session, e *discordgo.GuildMemberUpdat
 	if e.Member == nil || e.User == nil || e.User.Bot {
 		return
 	}
-	if err := b.api.SyncMember(context.Background(), e.GuildID, e.User.ID, e.User.Username, e.Roles); err != nil && !errors.Is(err, api.ErrConflict) {
+	if err := b.api.SyncMember(context.Background(), e.GuildID, e.User.ID, e.User.Username, e.DisplayName(), e.Roles); err != nil && !errors.Is(err, api.ErrConflict) {
 		b.log.Error("member update", "guild", e.GuildID, "err", err)
 	}
 }
@@ -615,10 +615,14 @@ func (b *Bot) guildIcon(guildID string) string {
 }
 
 // displayName is the member's name as the server shows it: their server nickname, else their
-// Discord display name, else the username HappyX stored.
+// Discord display name, else their username. Without them in the session state it is the one
+// HappyX stored.
 func (b *Bot) displayName(guildID string, m api.Member) string {
 	if dm, err := b.dg.State.Member(guildID, m.DiscordID); err == nil && dm.User != nil {
 		return dm.DisplayName()
+	}
+	if m.DisplayName != "" {
+		return m.DisplayName
 	}
 	return m.Username
 }
